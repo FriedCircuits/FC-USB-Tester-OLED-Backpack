@@ -1,6 +1,9 @@
 FC-USB-Tester-OLED-Backpack
 ===========================
-This is the source code for the USB Tester OLED Backpack found on:
+
+This is the source code for the USB Tester OLED Backpack 
+
+Which can be found at:
 https://www.tindie.com/shops/FriedCircuits/
 
 To compile this code you will need the following libraries from Adafruit
