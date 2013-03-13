@@ -1,6 +1,5 @@
 FC-USB-Tester-OLED-Backpack
 ===========================
-
 This is the source code for the USB Tester OLED Backpack 
 
 Which can be found at:
@@ -21,3 +20,13 @@ https://github.com/adafruit/
 
 This also works with a desktop java appilication for graphing and data logging in real time. 
 https://github.com/FriedCircuits/FC-USB-Tester-Data-Logger-App
+
+License: All source code and designs are released under 
+
+Creative Commons NonCommercial-ShareAlike 
+
+CC BY-NC-SA
+
+![CC BY-NC-SA](http://i.creativecommons.org/l/by-nc-sa/3.0/88x31.png)
+
+Please contact me for commercial opportunities. 
