@@ -105,8 +105,9 @@ void loop()
   current_mA = ina219.getCurrent_mA();
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   
- // if (shuntvoltage > 600) shuntvoltage = 0.00;
- // if (current_mA > 6000) current_mA = 0.00;
+  //Filters out odd readings where there is no load
+  if (shuntvoltage > 6000) shuntvoltage = 0.00;
+  if (current_mA > 6000) current_mA = 0.00;
   
   //Setup placement for sensor readouts
   display.setTextSize(1);
