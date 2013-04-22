@@ -105,7 +105,7 @@ void loop()
   current_mA = ina219.getCurrent_mA();
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   
-  //Filters out odd readings where there is no load
+  //Filters out odd readings when there is no load
   if (shuntvoltage > 6000) shuntvoltage = 0.00;
   if (current_mA > 6000) current_mA = 0.00;
   
