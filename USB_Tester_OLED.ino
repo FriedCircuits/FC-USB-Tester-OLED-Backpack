@@ -22,6 +22,8 @@ Kits are aviaible at www.tindie.com and more info can be found on www.friedcircu
 const int LEDPIN = 13;
 int ledWarn = 350; //Threshold in mA
 
+//Button
+const int btnPin = 10;
 
 //Current Sensor
 Adafruit_INA219 ina219;
@@ -70,6 +72,8 @@ void setup()
   pinMode(LEDPIN, OUTPUT);
   digitalWrite(LEDPIN, HIGH);
   
+  pinMode(btnPin, INPUT);
+  
   Serial.begin(115200);
   Serial.println("USB Tester OLED Backup Online");
    
@@ -105,7 +109,11 @@ void loop()
   current_mA = ina219.getCurrent_mA();
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   
+<<<<<<< HEAD
   //Filters out odd readings when there is no load
+=======
+ //Filters out odd readings when there is no load
+>>>>>>> Added design files in Eagle and PNG
   if (shuntvoltage > 6000) shuntvoltage = 0.00;
   if (current_mA > 6000) current_mA = 0.00;
   
@@ -138,9 +146,12 @@ void loop()
   Serial.print(":");
   Serial.print(current_mA);
   Serial.print(":");
-  Serial.print(freeRam());
+  //Serial.print(freeRam()); //Was for checking free ram during development
+  //Serial.print(":");
+  Serial.print(digitalRead(btnPin));
   Serial.println(":");
   //Serial.print(0x03, HEX);
+  
   
   //Refresh graph from current sensor data
   display.fillRect(graphX, 0, 1, 32, BLACK);
@@ -168,7 +179,7 @@ void loop()
      ledWarn = atoi(in);
   }
   
-  if (current_mA >= ledWarn){
+  if ((current_mA >= ledWarn) || (digitalRead(btnPin))){
    
     digitalWrite(LEDPIN, HIGH);
     
@@ -183,13 +194,13 @@ void loop()
 }
 
 
-//Copy of Arduino map function converted for floats
+//Copy of Arduino map function converted for floats, from a forum post
 float mapf(float x, float in_min, float in_max, float out_min, float out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-
+//From Arduino Playground
 int freeRam () {
   extern int __heap_start, *__brkval;
   int v;
