@@ -109,12 +109,8 @@ void loop()
   current_mA = ina219.getCurrent_mA();
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   
-<<<<<<< HEAD
-  //Filters out odd readings when there is no load
-=======
  //Filters out odd readings when there is no load
->>>>>>> Added design files in Eagle and PNG
-  if (shuntvoltage > 6000) shuntvoltage = 0.00;
+  if (shuntvoltage > 600) shuntvoltage = 0.00;
   if (current_mA > 6000) current_mA = 0.00;
   
   //Setup placement for sensor readouts
