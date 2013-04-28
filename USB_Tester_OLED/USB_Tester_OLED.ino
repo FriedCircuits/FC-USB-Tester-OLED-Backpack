@@ -40,6 +40,9 @@ int graph_MAX = 500;
 int graph_Mem[GRAPH_MEMORY];
 int ring_idx = 0; // graph_Mem is managed as a ring buffer.
 
+//Button
+const int btnPin = 10;
+
 //Current Sensor
 Adafruit_INA219 ina219;
 
@@ -87,6 +90,8 @@ void setup()
   pinMode(LEDPIN, OUTPUT);
   digitalWrite(LEDPIN, HIGH);
   
+  pinMode(btnPin, INPUT);
+  
   Serial.begin(115200);
   Serial.println("USB Tester OLED Backup Online");
    
@@ -127,8 +132,9 @@ void loop()
   current_mA = ina219.getCurrent_mA();
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   
- // if (shuntvoltage > 600) shuntvoltage = 0.00;
- // if (current_mA > 6000) current_mA = 0.00;
+ //Filters out odd readings when there is no load
+  if (shuntvoltage > 600) shuntvoltage = 0.00;
+  if (current_mA > 6000) current_mA = 0.00;
   
   //Setup placement for sensor readouts
   display.setTextSize(1);
@@ -159,9 +165,12 @@ void loop()
   Serial.print(":");
   Serial.print(current_mA);
   Serial.print(":");
-  Serial.print(freeRam());
+  //Serial.print(freeRam()); //Was for checking free ram during development
+  //Serial.print(":");
+  Serial.print(digitalRead(btnPin));
   Serial.println(":");
   //Serial.print(0x03, HEX);
+  
   
   //Refresh graph from current sensor data
   drawGraph(current_mA);
@@ -181,7 +190,7 @@ void loop()
      ledWarn = atoi(in);
   }
   
-  if (current_mA >= ledWarn){
+  if ((current_mA >= ledWarn) || (digitalRead(btnPin))){
    
     digitalWrite(LEDPIN, HIGH);
     
@@ -207,13 +216,13 @@ void drawGraph(float reading) {
 }
 
 
-//Copy of Arduino map function converted for floats
+//Copy of Arduino map function converted for floats, from a forum post
 float mapf(float x, float in_min, float in_max, float out_min, float out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-
+//From Arduino Playground
 int freeRam () {
   extern int __heap_start, *__brkval;
   int v;
