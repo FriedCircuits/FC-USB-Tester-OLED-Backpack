@@ -4,6 +4,17 @@ Created by: William Garrido
 Created: 01/10/2013
 This displays the current and voltage from the USB Tester to the OLED display using the OLED Backpack
 Kits are aviaible at www.tindie.com and more info can be found on www.friedcircuits.us
+
+Changelog by Edouard Lafargue
+
+2013.04.11
+- Autoscroll of graph
+
+ToDo:
+- Remove shunt voltage and load voltage display (are those really necessary ?)
+- Autoscale of graph
+
+
 **************************************/
 
 #include <Wire.h>
@@ -21,6 +32,13 @@ Kits are aviaible at www.tindie.com and more info can be found on www.friedcircu
 
 const int LEDPIN = 13;
 int ledWarn = 350; //Threshold in mA
+
+// Graph values:
+int graph_MAX = 500;
+// Graph area is from 84 to 128 (inclusive), 44 points altogether
+#define GRAPH_MEMORY 44
+int graph_Mem[GRAPH_MEMORY];
+int ring_idx = 0; // graph_Mem is managed as a ring buffer.
 
 //Button
 const int btnPin = 10;
@@ -68,7 +86,7 @@ static unsigned char PROGMEM FriedCircuitsUSBTester[] =
 
 void setup()
 {
-  
+
   pinMode(LEDPIN, OUTPUT);
   digitalWrite(LEDPIN, HIGH);
   
@@ -83,6 +101,11 @@ void setup()
   //by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
   display.begin(SSD1306_SWITCHCAPVCC);
  
+  // Initialize ring buffer
+  for (int i=0; i < GRAPH_MEMORY; i++) {
+    graph_Mem[i] = 0;
+  }
+
   
   //show splashscreen
   display.clearDisplay(); 
@@ -150,16 +173,8 @@ void loop()
   
   
   //Refresh graph from current sensor data
-  display.fillRect(graphX, 0, 1, 32, BLACK);
-  
-  graphY = mapf(current_mA, 0, 500, 32, 0);
-
-  display.drawPixel(graphX, graphY, WHITE);
- 
-  graphX++; 
-  
-  if (graphX >= 128) graphX = 84; //Restart graph once we are at edge of display
-  
+  drawGraph(current_mA);
+   
   if (Serial.available() > 0){
 
      char in[4];
@@ -187,6 +202,17 @@ void loop()
   
   delay(OLED_REFRESH_SPEED); 
 
+}
+
+// Draw the complete graph:
+void drawGraph(float reading) {
+  // Clear display:
+  display.fillRect(84, 0, 44, 32, BLACK);
+  graph_Mem[ring_idx] = mapf(reading, 0, graph_MAX, 32, 0);
+  ring_idx = (ring_idx+1)%GRAPH_MEMORY;
+  for (int i=0; i < GRAPH_MEMORY; i++) {
+    display.drawPixel(84+i, graph_Mem[(i+ring_idx)%GRAPH_MEMORY], WHITE);
+  }
 }
 
 
