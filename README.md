@@ -14,6 +14,10 @@ Adafruit INA219
 Adafruit SSD1306
 
 
+How to update firmware:
+http://friedcircuits.us/docs/oled-backup-how-to-update-firmware/
+
+
 They can all be found here:
 https://github.com/adafruit/
 
