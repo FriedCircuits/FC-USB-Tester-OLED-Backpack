@@ -24,6 +24,11 @@ ToDo:
 -Reduce logo display time
 -Enabled button to cycle display speed
 -Millis based delay
+
+- Edouard Lafargue
+2013.08.27
+- Add simple graph autoscale (500mA, 1A, 1.5A, 2A, 5A)
+
 **************************************/
 
 #include <Wire.h>
@@ -45,11 +50,18 @@ int ledWarn = 350; //Threshold in mA
 const int maxMode = 4;
 
 // Graph values:
-int graph_MAX = 500;
+
 // Graph area is from 0 to 128 (inclusive), 128 points altogether
 #define GRAPH_MEMORY 128
-int graph_Mem[GRAPH_MEMORY];
+float graph_Mem[GRAPH_MEMORY];
 int ring_idx = 0; // graph_Mem is managed as a ring buffer.
+
+// Autoscale management
+float autoscale_limits[] = {200, 500, 1000, 1500, 2000, 5000}; // in mA
+int autoscale_size = sizeof(autoscale_limits) / sizeof(float);
+int graph_MAX = 0; // Max scale by default
+int autoscale_max_reading = 0;
+int autoscale_countdown = GRAPH_MEMORY;
 
 //Button
 const int btnPin = 10;
@@ -134,7 +146,7 @@ void setup()
   display.clearDisplay(); 
   display.drawBitmap(0, 0, FriedCircuitsUSBTester, 128, 24, WHITE);
   display.display();
-  delay(1500);
+  delay(1000);
   display.clearDisplay();   // clears the screen and buffer
   
   digitalWrite(LEDPIN, LOW);
@@ -154,7 +166,6 @@ void loop()
   unsigned long interrupt_time2 = millis();
   
   if (interrupt_time2 - last_interrupt_time2 > OLED_REFRESH_SPEED){
-  
 
   shuntvoltage = ina219.getShuntVoltage_mV();
   busvoltage = ina219.getBusVoltage_V();
@@ -166,12 +177,23 @@ void loop()
 
   //Refresh graph from current sensor data
   drawGraph(current_mA);
- 
+  
+  // Display current scale
+  // Note: commented out, not quite sure this is very important since
+  // the graph is merely a trend indicator - we only have 24 pixels after
+  // all
+  // display.setCursor(104,0);
+  // display.print((autoscale_limits[graph_MAX]+0.0)/1000);
+
+   
   //Set x,y and print sensor data
   display.setCursor(0,25);
   //display.print("V:");
   display.print(loadvoltage);   display.print("V ");
   //display.print("A:");
+  if (current_mA < 1000) display.print(" ");
+  if (current_mA < 100) display.print(" ");
+  if (current_mA < 10) display.print(" ");
   display.print(current_mA);   display.print("mA ");
   display.print((current_mA*loadvoltage)/1000);  display.print("W");
   display.display();
@@ -233,12 +255,61 @@ void loop()
 
 // Draw the complete graph:
 void drawGraph(float reading) {
-  // Clear display:
-  //display.fillRect(0, 0, 128, 24, BLACK);
-  graph_Mem[ring_idx] = mapf(reading, 0, graph_MAX, 24, 0);
+  
+  // Adjust scale: we have GRAPH_MEMORY points, so whenever
+  // we cross a scale boundary, we initiate a countdown timer.
+  // This timer goes down at each redraw if we're under the previous lower scale
+  // boundary, otherwise it is reset. If we stay below the scale boundary until it
+  // reaches zero, then we scale down.
+
+
+  if (reading > autoscale_limits[graph_MAX]) {
+    // We need to scale up:
+    while (reading > autoscale_limits[graph_MAX]) {
+      graph_MAX++;
+      if (graph_MAX == autoscale_size-1)
+        break;
+      }
+    autoscale_countdown = GRAPH_MEMORY;
+    autoscale_max_reading = 0;
+    // Let user know the values just got rescaled
+    display.setCursor(122,0);
+    display.print("*");
+    delay(100);
+  } else if (graph_MAX > 0) {
+    // Do we need to scale down ?
+    if (reading < autoscale_limits[graph_MAX-1]) {
+      autoscale_countdown--; // If we are below the lower scale
+      // Keep track of max value of reading during the time we're under current
+      // scale limit, so that when we scale down, we go to the correct scale
+      // value right away:
+      if (reading > autoscale_max_reading)
+          autoscale_max_reading = reading;
+      if (autoscale_countdown == 0) {
+        // Time to scale down:
+        while (autoscale_max_reading < autoscale_limits[graph_MAX-1]) {
+          graph_MAX--;
+          if (graph_MAX == 0)
+            break;
+        }
+        autoscale_countdown = GRAPH_MEMORY;
+        autoscale_max_reading = 0;
+        // Let user know the values just got rescaled
+        display.setCursor(122,0);
+        display.print("*");
+        delay(100);
+      }
+    } else {
+      autoscale_countdown = GRAPH_MEMORY; // we are above the scale under us
+      autoscale_max_reading = 0;
+    }
+  }
+  
+  graph_Mem[ring_idx] = reading;
   ring_idx = (ring_idx+1)%GRAPH_MEMORY;
   for (int i=0; i < GRAPH_MEMORY; i++) {
-    display.drawPixel(i, graph_Mem[(i+ring_idx)%GRAPH_MEMORY], WHITE);
+    float val = 24 - mapf(graph_Mem[(i+ring_idx)%GRAPH_MEMORY], 0, autoscale_limits[graph_MAX], 0, 24);
+    display.drawPixel(i, val , WHITE);
   }
 }
 
