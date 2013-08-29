@@ -1,3 +1,4 @@
+
 /*************************************
 USB Tester OLED Display
 Created by: William Garrido
@@ -25,9 +26,13 @@ ToDo:
 -Enabled button to cycle display speed
 -Millis based delay
 
-- Edouard Lafargue
-2013.08.27
+2013.08.27 - Edouard Lafargue
 - Add simple graph autoscale (500mA, 1A, 1.5A, 2A, 5A)
+
+2013.08.29 - Edouard Lafargue
+- Use TimerOne interrupts to read values at a fixed rate, so that
+  we can energy consumption
+- New feature: multiple screens (ongoing)
 
 **************************************/
 
@@ -36,6 +41,7 @@ ToDo:
 #include <Adafruit_INA219.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <TimerOne.h>
 
 
 #define OLED_DC 5
@@ -57,7 +63,7 @@ float graph_Mem[GRAPH_MEMORY];
 int ring_idx = 0; // graph_Mem is managed as a ring buffer.
 
 // Autoscale management
-float autoscale_limits[] = {200, 500, 1000, 1500, 2000, 5000}; // in mA
+int autoscale_limits[] = {200, 500, 1000, 1500, 2000, 5000}; // in mA
 int autoscale_size = sizeof(autoscale_limits) / sizeof(float);
 int graph_MAX = 0; // Max scale by default
 int autoscale_max_reading = 0;
@@ -114,6 +120,56 @@ static unsigned char PROGMEM FriedCircuitsUSBTester[] =
 0x03, 0xFC, 0x00, 0x00, 0x00, 0x7F, 0x07, 0xE0, 0x00, 0x00, 0x1C, 0x0C, 0x0C, 0x40, 0x18, 0x30
 };
 
+// Voltages are now read in the interrupt routine, and available in
+// global (volatile because modified within an interrupt) variables:
+volatile float shuntvoltage = 0;
+volatile float busvoltage = 0;
+volatile float current_mA = 0;
+volatile float loadvoltage = 0;
+volatile float milliwatthours = 0;
+volatile float milliamphours = 0;
+
+// Keep track of peak/min significant values:
+volatile float peakCurrent = 0;
+volatile float voltageAtPeakCurrent = 0;
+volatile float minVoltage = 10;
+volatile float currentAtMinVoltage = 0;
+// (no need, we can compute it) volatile float peakPower = 0;
+volatile float voltageAtPeakPower = 0;
+volatile float currentAtPeakPower = 0;
+
+
+
+// Global defines for polling frequency:
+#define READFREQ 100000 // in microseconds
+
+// Multiple screen support
+int current_screen = 0;
+#define MAX_SCREENS  3;
+
+/**
+  Setting the last "X" seconds: use the serial link to set this up, and store value in eeprom ?
+  Add a command for auto screen cycling
+  Add a command to reset readings without unplugging
+
+  Here are all the screens. Going from one screen to the next using a short button press
+
+   - On all screens: instant voltage/current/Watts on bottom line
+
+   - 1st screen: "Graph"
+                current graph
+
+   - 2nd screen: "Peaks / Mins"
+                Peak current since startup (and voltage at that point)
+                Min voltage since startup (and current at that point)
+
+   - 3rd screen: "Energy / Power"
+                Watt hours (mWh until reached 1Wh, then in Wh ?)
+                Peak watts since startup, and current/voltage reading at that point - maximum power point
+                Amp hours since startup? nice to check battery capacity when charging a battery through USB ?
+
+*/
+
 
 void setup()
 {
@@ -151,68 +207,89 @@ void setup()
   
   digitalWrite(LEDPIN, LOW);
   
+  Timer1.initialize(READFREQ); // 50ms reading interval
+  Timer1.attachInterrupt(readADCs); 
+}
+
+/**
+ * This is where we do the reading of voltage & current. Should be kept as short
+ * as possible, of course.
+ */
+void readADCs() {
+  // TODO: check exact length of this interrupt routine on the scope using
+  // a signal line...
+  
+  sei(); // re-enable interrupts since the ina219 functions need those.
+         // in practice, we're doing nested interrupts, gotta be careful here...
+  shuntvoltage = ina219.getShuntVoltage_mV();
+  busvoltage = ina219.getBusVoltage_V();
+  current_mA = ina219.getCurrent_mA();
+  loadvoltage = busvoltage + (shuntvoltage / 1000);
+  milliwatthours += busvoltage*current_mA*READFREQ/1e6/3600; // 1 Wh = 3600 joules
+  milliamphours += current_mA*READFREQ/1e6/3600;
+  
+  // Update peaks and mins
+  if (current_mA > peakCurrent) {
+      peakCurrent = current_mA;
+      voltageAtPeakCurrent = busvoltage;
+  }
+  
+  if (loadvoltage < minVoltage) {
+      minVoltage = loadvoltage;
+      currentAtMinVoltage = current_mA;
+  }
+  
+  // TODO: check if we gain time by using a peakPower variable ?
+  if ( (voltageAtPeakPower*currentAtPeakPower) < (loadvoltage*current_mA)) {
+      voltageAtPeakPower = loadvoltage;
+      currentAtPeakPower = current_mA;
+  }
+  
 }
 
 
+/**
+ * This is the display loop and button handler
+ */
 void loop()
 {
     
-  float shuntvoltage = 0;
-  float busvoltage = 0;
-  float current_mA = 0;
-  float loadvoltage = 0;
   
   static unsigned long last_interrupt_time2 = 0;
   unsigned long interrupt_time2 = millis();
   
   if (interrupt_time2 - last_interrupt_time2 > OLED_REFRESH_SPEED){
-
-  shuntvoltage = ina219.getShuntVoltage_mV();
-  busvoltage = ina219.getBusVoltage_V();
-  current_mA = ina219.getCurrent_mA();
-  loadvoltage = busvoltage + (shuntvoltage / 1000);
   
   //Setup placement for sensor readouts
   display.clearDisplay();
-
-  //Refresh graph from current sensor data
-  drawGraph(current_mA);
   
-  // Display current scale
-  // Note: commented out, not quite sure this is very important since
-  // the graph is merely a trend indicator - we only have 24 pixels after
-  // all
-  // display.setCursor(104,0);
-  // display.print((autoscale_limits[graph_MAX]+0.0)/1000);
-
-   
+  switch (current_screen) {
+    case 0:
+      drawScope();
+      break;
+    case 1:
+      drawEnergy();
+      break;
+    case 2:
+       drawPeakMins();
+       break;
+    default:
+      drawScope();    
+  }
+  
   //Set x,y and print sensor data
   display.setCursor(0,25);
   //display.print("V:");
   display.print(loadvoltage);   display.print("V ");
   //display.print("A:");
-  if (current_mA < 1000) display.print(" ");
-  if (current_mA < 100) display.print(" ");
-  if (current_mA < 10) display.print(" ");
-  display.print(current_mA);   display.print("mA ");
-  display.print((current_mA*loadvoltage)/1000);  display.print("W");
+  printJustified(current_mA);   display.print("mA ");
+  display.print((current_mA*loadvoltage)/1000);  display.print("W");  
+
+
+  
   display.display();
 
-//Serial output for data logging with Java app  
-  Serial.print(":");
-  Serial.print(busvoltage);
-  Serial.print(":");
-  Serial.print(shuntvoltage);
-  Serial.print(":");
-  Serial.print(loadvoltage);
-  Serial.print(":");
-  Serial.print(current_mA);
-  Serial.print(":");
-  //Serial.print(freeRam()); //Was for checking free ram during development
-  //Serial.print(":");
-  Serial.print(digitalRead(btnPin));
-  Serial.println(":");
-  
+  serialOutput();
   
   last_interrupt_time2 = interrupt_time2;
 }
@@ -246,12 +323,69 @@ void loop()
   }
 
   if (btnState) setButtonMode(digitalRead(btnPin));
+
   
 
   
   //delay(OLED_REFRESH_SPEED); 
 
 }
+
+// Our various screens:
+void drawScope() {
+    //Refresh graph from current sensor data
+  drawGraph(current_mA);
+  
+  // Display current scale
+  // Note: commented out, not quite sure this is very important since
+  // the graph is merely a trend indicator - we only have 24 pixels after
+  // all
+  // display.setCursor(104,0);
+  // display.print((autoscale_limits[graph_MAX]+0.0)/1000);
+
+   
+}
+
+void drawEnergy() {
+  display.setCursor(0,0);
+  printJustified(milliwatthours);
+  display.print("mWh ");
+  printJustified(milliamphours);
+  display.print("mAh");
+
+  display.setCursor(0,8);
+  display.print("Peak: ");
+  display.print(voltageAtPeakPower*currentAtPeakPower/1000);
+  display.print("W");
+  display.setCursor(0,16);
+  display.print("@ ");
+  display.print(voltageAtPeakPower);
+  display.print("V & ");
+  display.print(currentAtPeakPower);
+  display.print("mA");
+  
+  display.drawFastHLine(0,24,128,WHITE);
+
+}
+
+void drawPeakMins() {
+  display.setCursor(0,0);
+  display.print("Peak:");
+  display.print(peakCurrent);
+  display.print("mA (");
+  display.print(voltageAtPeakCurrent);
+  display.print("V) ");
+  display.setCursor(0,9);
+  display.print("Min:");
+  display.print(minVoltage);
+  display.print("V (");
+  display.print(currentAtMinVoltage);
+  display.print("mA)");
+  
+  display.drawFastHLine(0,23,128,WHITE);
+
+}
+
 
 // Draw the complete graph:
 void drawGraph(float reading) {
@@ -314,6 +448,36 @@ void drawGraph(float reading) {
 }
 
 
+  //Serial output for data logging with Java app
+void serialOutput() {
+  Serial.print(":");
+  Serial.print(busvoltage);
+  Serial.print(":");
+  Serial.print(shuntvoltage);
+  Serial.print(":");
+  Serial.print(loadvoltage);
+  Serial.print(":");
+  Serial.print(current_mA);
+  Serial.print(":");
+  //Serial.print(freeRam()); //Was for checking free ram during development
+  //Serial.print(":");
+  Serial.print(digitalRead(btnPin));
+  Serial.println(":");
+  
+}
+
+
+// Right-justify values:
+void printJustified(float val)
+{
+    if (val < 1000) display.print(" ");
+  if (val < 100) display.print(" ");
+  if (val < 10) display.print(" ");
+  display.print(val); 
+
+}
+
+
 //Copy of Arduino map function converted for floats, from a forum post
 float mapf(float x, float in_min, float in_max, float out_min, float out_max)
 {
@@ -335,37 +499,9 @@ void setButtonMode(int button){
   // If interrupts come faster than 200ms, assume it's a bounce and ignore
   if (interrupt_time - last_interrupt_time > 200)
   {
-    if (currMode == maxMode)
-	{
-		currMode = 0;
-	}
-	else 
-	{
-		currMode++;
-	}
-	
-	switch(currMode){
-          case 0:
-            OLED_REFRESH_SPEED = speed0;
-          break;
-            
-          case 1:
-            OLED_REFRESH_SPEED = speed1;
-          break;            
-          
-          case 2:
-            OLED_REFRESH_SPEED = speed2;
-          break;          
-          
-          case 3:
-            OLED_REFRESH_SPEED = speed3;
-          break;          
-          
-          case 4:
-            OLED_REFRESH_SPEED = speed4;
-          break;
-        } 
- }
+    current_screen = (current_screen + 1) % MAX_SCREENS;
+   }
+ 
   last_interrupt_time = interrupt_time;
 
 }
