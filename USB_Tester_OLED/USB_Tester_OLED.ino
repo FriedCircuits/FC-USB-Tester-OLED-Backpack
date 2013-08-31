@@ -34,6 +34,9 @@ ToDo:
   we can energy consumption
 - New feature: multiple screens (ongoing)
 
+2013.08.30 - Edouard Lafargue
+- Display mA without decimal points
+
 **************************************/
 
 #include <Wire.h>
@@ -49,6 +52,14 @@ ToDo:
 #define OLED_CLK SCK
 #define OLED_MOSI MOSI
 #define OLED_RESET 9
+
+// Define two set/clear macros to do PIN manipulation
+// way way faster than Arduino's digitalWrite.
+// inspired by the the _BV() macro
+#define setpin(port, pin) (port) |= (1 << (pin)) 
+#define clearpin(port, pin) (port) &= ~(1 << (pin))
+
+#define DEBUG 1
 
 const int LEDPIN = 13;
 int ledWarn = 350; //Threshold in mA
@@ -145,7 +156,7 @@ volatile float currentAtPeakPower = 0;
 
 // Multiple screen support
 int current_screen = 0;
-#define MAX_SCREENS  3;
+#define MAX_SCREENS  4;
 
 /**
   Setting the last "X" seconds: use the serial link to set this up, and store value in eeprom ?
@@ -164,7 +175,7 @@ int current_screen = 0;
                 Min voltage since startup (and current at that point)
 
    - 3rd screen: "Energy / Power"
-                Watt hours (mWh until reached 1Wh, then in Wh ?)
+                Watt hours (mWh until reached 1Wh, then in Wh ? not implemented yet)
                 Peak watts since startup, and current/voltage reading at that point - maximum power point
                 Amp hours since startup? nice to check battery capacity when charging a battery through USB ?
 
@@ -218,6 +229,10 @@ void setup()
 void readADCs() {
   // TODO: check exact length of this interrupt routine on the scope using
   // a signal line...
+#ifdef DEBUG
+      setpin(PORTD,5);  // Just a debug signal for my scope to check
+                        // how long it takes for the loop below to complete
+#endif
   
   sei(); // re-enable interrupts since the ina219 functions need those.
          // in practice, we're doing nested interrupts, gotta be careful here...
@@ -245,6 +260,12 @@ void readADCs() {
       currentAtPeakPower = current_mA;
   }
   
+#ifdef DEBUG
+      clearpin(PORTD,5);  // Just a debug signal for my scope to check
+                        // how long it takes for the loop below to complete
+#endif
+
+  
 }
 
 
@@ -266,25 +287,24 @@ void loop()
   switch (current_screen) {
     case 0:
       drawScope();
+      drawBottomLine();
       break;
     case 1:
       drawEnergy();
+      drawBottomLine();
       break;
     case 2:
        drawPeakMins();
+       drawBottomLine();
+       break;
+    case 3:
+       drawBig();
+       drawBottomLine();
        break;
     default:
-      drawScope();    
+      drawScope();
   }
   
-  //Set x,y and print sensor data
-  display.setCursor(0,25);
-  //display.print("V:");
-  display.print(loadvoltage);   display.print("V ");
-  //display.print("A:");
-  printJustified(current_mA);   display.print("mA ");
-  display.print((current_mA*loadvoltage)/1000);  display.print("W");  
-
 
   
   display.display();
@@ -331,6 +351,19 @@ void loop()
 
 }
 
+
+void drawBottomLine() {
+    //Set x,y and print sensor data
+  display.setCursor(0,25);
+  //display.print("V:");
+  display.print(loadvoltage);   display.print("V ");
+  //display.print("A:");
+  printJustified(current_mA);   display.print("mA ");
+  display.print((current_mA*loadvoltage)/1000);  display.print("W");  
+
+}
+
+
 // Our various screens:
 void drawScope() {
     //Refresh graph from current sensor data
@@ -346,6 +379,8 @@ void drawScope() {
    
 }
 
+// Draw current energy values and peak
+// power
 void drawEnergy() {
   display.setCursor(0,0);
   printJustified(milliwatthours);
@@ -368,6 +403,8 @@ void drawEnergy() {
 
 }
 
+
+// Displays peak and minimum values
 void drawPeakMins() {
   display.setCursor(0,0);
   display.print("Peak:");
@@ -384,6 +421,17 @@ void drawPeakMins() {
   
   display.drawFastHLine(0,23,128,WHITE);
 
+}
+
+void drawBig() {
+  display.setCursor(0,0);
+  display.setTextSize(3);
+  float pwr = (current_mA*loadvoltage)/1000;
+  if (pwr < 100) display.print(" ");
+  if (pwr < 10) display.print(" ");
+  display.print(pwr);
+  display.print("W");
+  display.setTextSize(1);
 }
 
 
@@ -467,13 +515,15 @@ void serialOutput() {
 }
 
 
-// Right-justify values:
+// Right-justify values and round to nearest integer
 void printJustified(float val)
 {
-    if (val < 1000) display.print(" ");
+  val = floor(val + 0.5);
+  if (val < 1000) display.print(" ");
   if (val < 100) display.print(" ");
   if (val < 10) display.print(" ");
-  display.print(val); 
+  
+  display.print(val,0); 
 
 }
 
