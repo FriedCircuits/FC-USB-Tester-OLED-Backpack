@@ -218,7 +218,7 @@ void setup()
   
   digitalWrite(LEDPIN, LOW);
   
-  Timer1.initialize(READFREQ); // 50ms reading interval
+  Timer1.initialize(READFREQ); // 100ms reading interval
   Timer1.attachInterrupt(readADCs); 
 }
 
