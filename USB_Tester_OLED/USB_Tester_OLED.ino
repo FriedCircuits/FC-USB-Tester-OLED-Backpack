@@ -156,7 +156,7 @@ volatile float currentAtPeakPower = 0;
 
 // Multiple screen support
 int current_screen = 0;
-#define MAX_SCREENS  4;
+#define MAX_SCREENS  6;
 
 /**
   Setting the last "X" seconds: use the serial link to set this up, and store value in eeprom ?
@@ -298,9 +298,16 @@ void loop()
        drawBottomLine();
        break;
     case 3:
-       drawBig();
+       drawBig((current_mA*loadvoltage)/1000, "W",2);
        drawBottomLine();
        break;
+    case 4:
+       drawBig(current_mA, "mA",0);
+       drawBottomLine();
+       break;
+    case 5:
+        drawBig(loadvoltage, "V",2);
+       drawBottomLine();
     default:
       drawScope();
   }
@@ -343,11 +350,6 @@ void loop()
   }
 
   if (btnState) setButtonMode(digitalRead(btnPin));
-
-  
-
-  
-  //delay(OLED_REFRESH_SPEED); 
 
 }
 
@@ -408,7 +410,7 @@ void drawEnergy() {
 void drawPeakMins() {
   display.setCursor(0,0);
   display.print("Peak:");
-  display.print(peakCurrent);
+  printJustified(peakCurrent);
   display.print("mA (");
   display.print(voltageAtPeakCurrent);
   display.print("V) ");
@@ -423,14 +425,18 @@ void drawPeakMins() {
 
 }
 
-void drawBig() {
+// Displays one big value & unit, with X number of decimals
+// Display width is 7 digits wide, we leave the 2 rightmost digits
+// for unit display
+void drawBig(float val, char* unit, int decimals) {
   display.setCursor(0,0);
   display.setTextSize(3);
-  float pwr = (current_mA*loadvoltage)/1000;
-  if (pwr < 100) display.print(" ");
-  if (pwr < 10) display.print(" ");
-  display.print(pwr);
-  display.print("W");
+  if ((decimals < 1) && (val < 10000)) display.print(" ");
+  if ((decimals < 2) && (val < 1000)) display.print(" ");
+  if (val < 100) display.print(" ");
+  if (val < 10) display.print(" ");
+  display.print(val, decimals);
+  display.print(unit);
   display.setTextSize(1);
 }
 
