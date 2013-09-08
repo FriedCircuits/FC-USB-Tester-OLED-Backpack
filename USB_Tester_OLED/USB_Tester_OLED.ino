@@ -306,8 +306,9 @@ void loop()
        drawBottomLine();
        break;
     case 5:
-        drawBig(loadvoltage, "V",2);
+       drawBig(loadvoltage, "V",2);
        drawBottomLine();
+       break;
     default:
       drawScope();
   }
