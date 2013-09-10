@@ -37,6 +37,12 @@ ToDo:
 2013.08.30 - Edouard Lafargue
 - Display mA without decimal points
 
+2013.09.09 - William Garrido
+-Added decimal to lower display
+-Top display auto adjust if decimal needed
+-Turned off debug by default
+-ToDo: Long press clears peaks and engery usage
+
 **************************************/
 
 #include <Wire.h>
@@ -59,7 +65,7 @@ ToDo:
 #define setpin(port, pin) (port) |= (1 << (pin)) 
 #define clearpin(port, pin) (port) &= ~(1 << (pin))
 
-#define DEBUG 1
+#define DEBUG 0
 
 const int LEDPIN = 13;
 int ledWarn = 350; //Threshold in mA
@@ -302,7 +308,14 @@ void loop()
        drawBottomLine();
        break;
     case 4:
-       drawBig(current_mA, "mA",0);
+       if (current_mA < 1000) 
+       {
+         drawBig(current_mA, "mA",1);
+       }
+       else
+       {
+         drawBig(current_mA, "mA",0);
+       }
        drawBottomLine();
        break;
     case 5:
@@ -432,8 +445,11 @@ void drawPeakMins() {
 void drawBig(float val, char* unit, int decimals) {
   display.setCursor(0,0);
   display.setTextSize(3);
-  if ((decimals < 1) && (val < 10000)) display.print(" ");
+  if (unit != "mA"){
+ 
   if ((decimals < 2) && (val < 1000)) display.print(" ");
+  }
+  if ((decimals < 1) && (val < 10000)) display.print(" ");
   if (val < 100) display.print(" ");
   if (val < 10) display.print(" ");
   display.print(val, decimals);
@@ -525,12 +541,12 @@ void serialOutput() {
 // Right-justify values and round to nearest integer
 void printJustified(float val)
 {
-  val = floor(val + 0.5);
+  //val = floor(val + 0.5);
   if (val < 1000) display.print(" ");
   if (val < 100) display.print(" ");
   if (val < 10) display.print(" ");
   
-  display.print(val,0); 
+  display.print(val,2); 
 
 }
 
