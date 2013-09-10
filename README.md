@@ -14,6 +14,10 @@ Adafruit INA219
 Adafruit SSD1306
 
 
+The recent version also needs the TimerOne library
+https://code.google.com/p/arduino-timerone/
+
+
 How to update firmware:
 http://friedcircuits.us/docs/oled-backpack-how-to-update-firmware/
 
