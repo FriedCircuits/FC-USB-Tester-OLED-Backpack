@@ -41,7 +41,7 @@ ToDo:
 -Added decimal to lower display
 -Top display auto adjust if decimal needed
 -Turned off debug by default
--ToDo: Long press clears peaks and engery usage
+-Long press clears peaks and energy usage
 
 **************************************/
 
@@ -569,12 +569,39 @@ void setButtonMode(int button){
   static unsigned long last_interrupt_time = 0;
   static uint8_t currMode;
   unsigned long interrupt_time = millis();
+  static unsigned countBtn = 0;
   // If interrupts come faster than 200ms, assume it's a bounce and ignore
   if (interrupt_time - last_interrupt_time > 200)
   {
     current_screen = (current_screen + 1) % MAX_SCREENS;
    }
  
-  last_interrupt_time = interrupt_time;
+  
+  //Detect long button press, counting time button is pressed
+  if (interrupt_time - last_interrupt_time < 100)
+  {
+    countBtn++;
+ 
+    if (countBtn > 30000){
+      //Serial.println("Reset");
+      peakCurrent = 0;
+      voltageAtPeakCurrent = 0;
+      minVoltage = 0;
+      currentAtMinVoltage = 0;
+      voltageAtPeakPower = 0;
+      currentAtPeakPower = 0;
+      milliwatthours = 0;
+      milliamphours = 0;
+    }          
+    
+  }
+  else {
+   countBtn = 0; 
+  }
+  
+ last_interrupt_time = interrupt_time;
 
 }
+
+
+
