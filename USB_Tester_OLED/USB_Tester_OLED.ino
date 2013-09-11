@@ -43,12 +43,13 @@ ToDo:
 -Turned off debug by default
 -Long press clears peaks and energy usage
 
-2013/09/10 - William Garrido
+2013.09.10 - William Garrido
 -Added system display message handling with display time
 -Added Reset message
 How to use setMsg()
 Call setMsg(Message, time to display)
-
+-Remove decimal due to inacurrate, IC is .8mA resolution
+-fixed which voltage var for peak current tracking
 
 **************************************/
 
@@ -266,7 +267,7 @@ void readADCs() {
   // Update peaks and mins
   if (current_mA > peakCurrent) {
       peakCurrent = current_mA;
-      voltageAtPeakCurrent = busvoltage;
+      voltageAtPeakCurrent = loadvoltage;
   }
   
   if (loadvoltage < minVoltage) {
@@ -322,14 +323,7 @@ void loop()
        drawBottomLine();
        break;
     case 4:
-       if (current_mA < 1000) 
-       {
-         drawBig(current_mA, "mA",1);
-       }
-       else
-       {
-         drawBig(current_mA, "mA",0);
-       }
+       drawBig(current_mA, "mA",0);
        drawBottomLine();
        break;
     case 5:
@@ -386,11 +380,9 @@ void loop()
 
 
 void drawBottomLine() {
-    //Set x,y and print sensor data
+  //Set x,y and print sensor data
   display.setCursor(0,25);
-  //display.print("V:");
   display.print(loadvoltage);   display.print("V ");
-  //display.print("A:");
   printJustified(current_mA);   display.print("mA ");
   display.print((current_mA*loadvoltage)/1000);  display.print("W");  
 
@@ -462,10 +454,7 @@ void drawPeakMins() {
 void drawBig(float val, char* unit, int decimals) {
   display.setCursor(0,0);
   display.setTextSize(3);
-  if (unit != "mA"){
- 
   if ((decimals < 2) && (val < 1000)) display.print(" ");
-  }
   if ((decimals < 1) && (val < 10000)) display.print(" ");
   if (val < 100) display.print(" ");
   if (val < 10) display.print(" ");
@@ -587,12 +576,12 @@ void serialOutput() {
 // Right-justify values and round to nearest integer
 void printJustified(float val)
 {
-  //val = floor(val + 0.5);
+  val = floor(val + 0.5);
   if (val < 1000) display.print(" ");
   if (val < 100) display.print(" ");
   if (val < 10) display.print(" ");
   
-  display.print(val,2); 
+  display.print(val,0); 
 
 }
 
