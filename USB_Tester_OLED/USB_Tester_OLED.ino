@@ -50,6 +50,7 @@ How to use setMsg()
 Call setMsg(Message, time to display)
 -Remove decimal due to inacurrate, IC is .8mA resolution
 -fixed which voltage var for peak current tracking
+-fixed min voltage\current reset
 
 **************************************/
 
@@ -622,8 +623,8 @@ void setButtonMode(int button){
       setMsg("RESET", 10);
       peakCurrent = 0;
       voltageAtPeakCurrent = 0;
-      minVoltage = 0;
-      currentAtMinVoltage = 0;
+      minVoltage = loadvoltage;
+      currentAtMinVoltage = current_mA;
       voltageAtPeakPower = 0;
       currentAtPeakPower = 0;
       milliwatthours = 0;
