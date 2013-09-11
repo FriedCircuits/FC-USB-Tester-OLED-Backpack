@@ -43,6 +43,13 @@ ToDo:
 -Turned off debug by default
 -Long press clears peaks and energy usage
 
+2013/09/10 - William Garrido
+-Added system display message handling with display time
+-Added Reset message
+How to use setMsg()
+Call setMsg(Message, time to display)
+
+
 **************************************/
 
 #include <Wire.h>
@@ -80,7 +87,7 @@ float graph_Mem[GRAPH_MEMORY];
 int ring_idx = 0; // graph_Mem is managed as a ring buffer.
 
 // Autoscale management
-int autoscale_limits[] = {200, 500, 1000, 1500, 2000, 5000}; // in mA
+int autoscale_limits[] = {100, 200, 500, 1000, 1500, 2500, 3200}; // in mA
 int autoscale_size = sizeof(autoscale_limits) / sizeof(float);
 int graph_MAX = 0; // Max scale by default
 int autoscale_max_reading = 0;
@@ -163,6 +170,13 @@ volatile float currentAtPeakPower = 0;
 // Multiple screen support
 int current_screen = 0;
 #define MAX_SCREENS  6;
+
+//Display message handling
+unsigned int setDisplayTime = 0;
+char setMsgDisplay[10];
+int oldScreen = 0;
+bool msgDisplay = false;
+#define msgScreen 6;
 
 /**
   Setting the last "X" seconds: use the serial link to set this up, and store value in eeprom ?
@@ -322,6 +336,9 @@ void loop()
        drawBig(loadvoltage, "V",2);
        drawBottomLine();
        break;
+    case 6: //This is a special screen only called within the sketch to take over display with user message
+       drawMsg();
+       break;
     default:
       drawScope();
   }
@@ -457,6 +474,35 @@ void drawBig(float val, char* unit, int decimals) {
   display.setTextSize(1);
 }
 
+//Displays message in large font on entire display
+void setMsg(char* msg, int time)
+{
+   if(msgDisplay == false){
+     setDisplayTime = time;
+     strcpy(setMsgDisplay, msg);
+     msgDisplay=true;
+     oldScreen = current_screen;
+     current_screen=msgScreen;
+   }
+}
+void drawMsg()
+{
+  static unsigned msgTime = 0;
+  
+  if (msgTime <= setDisplayTime){
+  display.setCursor(0,0);
+  display.setTextSize(3);
+  display.print(setMsgDisplay);
+  display.setTextSize(1);
+  msgTime++;
+  }
+  else {
+    current_screen = oldScreen;
+    msgTime = 0;
+    msgDisplay=false;
+  }
+  
+}
 
 // Draw the complete graph:
 void drawGraph(float reading) {
@@ -574,6 +620,7 @@ void setButtonMode(int button){
   if (interrupt_time - last_interrupt_time > 200)
   {
     current_screen = (current_screen + 1) % MAX_SCREENS;
+    //setMsg(getScreenType(), 10); 
    }
  
   
@@ -583,7 +630,7 @@ void setButtonMode(int button){
     countBtn++;
  
     if (countBtn > 30000){
-      //Serial.println("Reset");
+      setMsg("RESET", 10);
       peakCurrent = 0;
       voltageAtPeakCurrent = 0;
       minVoltage = 0;
