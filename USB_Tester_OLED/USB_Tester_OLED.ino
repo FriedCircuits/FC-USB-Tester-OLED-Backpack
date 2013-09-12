@@ -52,6 +52,14 @@ Call setMsg(Message, time to display)
 -fixed which voltage var for peak current tracking
 -fixed min voltage\current reset
 
+2013.09.11 - William Garrido
+-Rewrote button function using ClickButton library from 
+http://code.google.com/p/clickbutton/wiki/Usage
+Fixes screen changing when reseting, 
+so action happens after button is let go
+-Added 2nd printJustified function for decimal
+-Now mWh and mAh use decimals
+
 **************************************/
 
 #include <Wire.h>
@@ -60,7 +68,7 @@ Call setMsg(Message, time to display)
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <TimerOne.h>
-
+#include <ClickButton.h>
 
 #define OLED_DC 5
 #define OLED_CS SS
@@ -97,6 +105,7 @@ int autoscale_countdown = GRAPH_MEMORY;
 
 //Button
 const int btnPin = 10;
+ClickButton modeBtn(btnPin, HIGH);
 
 //Current Sensor
 Adafruit_INA219 ina219;
@@ -210,7 +219,11 @@ void setup()
   pinMode(LEDPIN, OUTPUT);
   digitalWrite(LEDPIN, HIGH);
   
-  pinMode(btnPin, INPUT);
+  //Setup button times
+  modeBtn.debounceTime   = 20;   // Debounce timer in ms
+  modeBtn.multiclickTime = 250;  // Time limit for multi clicks
+  modeBtn.longClickTime  = 2000; // time until "held-down clicks" register
+
   
   Serial.begin(115200);
   Serial.println("USB Tester OLED Backup Online");
@@ -296,7 +309,8 @@ void readADCs() {
  */
 void loop()
 {
-    
+  
+  modeBtn.Update();  
   
   static unsigned long last_interrupt_time2 = 0;
   unsigned long interrupt_time2 = millis();
@@ -375,7 +389,7 @@ void loop()
      digitalWrite(LEDPIN, LOW);
   }
 
-  if (btnState) setButtonMode(digitalRead(btnPin));
+  if (modeBtn.clicks != 0) setButtonMode(modeBtn.clicks);
 
 }
 
@@ -409,9 +423,9 @@ void drawScope() {
 // power
 void drawEnergy() {
   display.setCursor(0,0);
-  printJustified(milliwatthours);
+  printJustified2(milliwatthours);
   display.print("mWh ");
-  printJustified(milliamphours);
+  printJustified2(milliamphours);
   display.print("mAh");
 
   display.setCursor(0,8);
@@ -586,6 +600,17 @@ void printJustified(float val)
 
 }
 
+// Right-justify values
+void printJustified2(float val)
+{
+  if (val < 1000) display.print(" ");
+  if (val < 100) display.print(" ");
+  if (val < 10) display.print(" ");
+  
+  display.print(val,2); 
+
+}
+
 
 //Copy of Arduino map function converted for floats, from a forum post
 float mapf(float x, float in_min, float in_max, float out_min, float out_max)
@@ -600,44 +625,32 @@ int freeRam () {
   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 
+//Handles setting screen and reseting points\
+//Can be used to add function based on 2+ clicks
+void setButtonMode(int btnClicks){
 
-void setButtonMode(int button){
-  static unsigned long last_interrupt_time = 0;
-  static uint8_t currMode;
-  unsigned long interrupt_time = millis();
-  static unsigned countBtn = 0;
-  // If interrupts come faster than 200ms, assume it's a bounce and ignore
-  if (interrupt_time - last_interrupt_time > 200)
-  {
-    current_screen = (current_screen + 1) % MAX_SCREENS;
-    //setMsg(getScreenType(), 10); 
-   }
- 
-  
-  //Detect long button press, counting time button is pressed
-  if (interrupt_time - last_interrupt_time < 100)
-  {
-    countBtn++;
- 
-    if (countBtn > 30000){
-      setMsg("RESET", 10);
-      peakCurrent = 0;
-      voltageAtPeakCurrent = 0;
-      minVoltage = loadvoltage;
-      currentAtMinVoltage = current_mA;
-      voltageAtPeakPower = 0;
-      currentAtPeakPower = 0;
-      milliwatthours = 0;
-      milliamphours = 0;
-    }          
+  switch (btnClicks){
     
+    case -1: //longpress
+        setMsg("RESET", 10);
+        peakCurrent = 0;
+        voltageAtPeakCurrent = 0;
+        minVoltage = loadvoltage;
+        currentAtMinVoltage = current_mA;
+        voltageAtPeakPower = 0;
+        currentAtPeakPower = 0;
+        milliwatthours = 0;
+        milliamphours = 0;
+        break;
+    
+    case 1:
+        current_screen = (current_screen + 1) % MAX_SCREENS;
+    break;
+    
+   //default:
+   
   }
-  else {
-   countBtn = 0; 
-  }
-  
- last_interrupt_time = interrupt_time;
-
+    
 }
 
 
