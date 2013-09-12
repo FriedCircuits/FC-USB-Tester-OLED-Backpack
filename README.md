@@ -13,9 +13,11 @@ Adafruit INA219
 
 Adafruit SSD1306
 
+Additonal Libraries
 
-The recent version also needs the TimerOne library
-https://code.google.com/p/arduino-timerone/
+TimerOne - https://code.google.com/p/arduino-timerone/
+
+ClickButton - http://code.google.com/p/clickbutton/
 
 
 How to update firmware:
