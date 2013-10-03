@@ -28,11 +28,6 @@ How to update firmware:
 http://friedcircuits.us/docs/oled-backpack-how-to-update-firmware/
 
 
-They can all be found here:
-
-https://github.com/adafruit/
-
-
 This also works with a desktop java appilication for graphing and data logging in real time. 
 
 https://github.com/FriedCircuits/FC-USB-Tester-Data-Logger-App
