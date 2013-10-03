@@ -8,15 +8,15 @@ https://www.tindie.com/shops/FriedCircuits/
 To compile this code you will need the following libraries:
 ===========================
 
-[Adafruit GFX)](https://github.com/adafruit/Adafruit-GFX-Library)
+[Adafruit GFX](https://github.com/adafruit/Adafruit-GFX-Library)
 
 [Adafruit INA219](https://github.com/adafruit/Adafruit_INA219)
 
 [Adafruit SSD1306](https://github.com/adafruit/Adafruit_SSD1306)
 
-TimerOne - https://code.google.com/p/arduino-timerone/
+[TimerOne](https://code.google.com/p/arduino-timerone/)
 
-ClickButton - http://code.google.com/p/clickbutton/
+[ClickButton](http://code.google.com/p/clickbutton/)
 
 Download Zip for complete working package
 
