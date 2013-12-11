@@ -5,6 +5,7 @@ This is the source code for the USB Tester OLED Backpack
 Which can be found at:
 https://www.tindie.com/shops/FriedCircuits/
 
+
 To compile this code you will need the following libraries:
 ===========================
 
@@ -18,9 +19,10 @@ To compile this code you will need the following libraries:
 
 [ClickButton](http://code.google.com/p/clickbutton/)
 
-Download Zip for complete working package
+Download Zip for complete working package for v1 of the Backpack.
 
 [OLED_Working_Package-v1.2.zip](https://github.com/FriedCircuits/FC-USB-Tester-OLED-Backpack/blob/master/OLED_Working_Package-v1.2.zip)
+
 
 
 How to update firmware:
