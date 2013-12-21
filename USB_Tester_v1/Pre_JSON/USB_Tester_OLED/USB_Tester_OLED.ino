@@ -1,6 +1,6 @@
 
 /*************************************
-USB Tester OLED Display - v1.2
+USB Tester OLED Display
 Created by: William Garrido
 Created: 01/10/2013
 This displays the current and voltage from the USB Tester to the OLED display using the OLED Backpack
@@ -60,11 +60,6 @@ so action happens after button is let go
 -Added 2nd printJustified function for decimal
 -Now mWh and mAh use decimals
 
-2013.11.10 - Ed Lafargue
-- Add support for basic serial commands
-- Keep graph memory as unsigned ints instead of floats, saves 256 bytes in memory!
-- 
-
 **************************************/
 
 #include <Wire.h>
@@ -75,17 +70,11 @@ so action happens after button is let go
 #include <TimerOne.h>
 #include <ClickButton.h>
 
-// All hardware pin usage is defined here:
 #define OLED_DC 5
 #define OLED_CS SS
 #define OLED_CLK SCK
 #define OLED_MOSI MOSI
 #define OLED_RESET 9
-#define LEDPIN 13
-#define BTN_PIN 10
-//USB Data Lines
-#define USB_DP A1
-#define USB_DM A0
 
 // Define two set/clear macros to do PIN manipulation
 // way way faster than Arduino's digitalWrite.
@@ -95,53 +84,50 @@ so action happens after button is let go
 
 #define DEBUG 0
 
-uint16_t ledWarn = 350; //Threshold in mA
+const int LEDPIN = 13;
+int ledWarn = 350; //Threshold in mA
+
+const int maxMode = 4;
 
 // Graph values:
 
-// Graph area is from 0 to 127
+// Graph area is from 0 to 128 (inclusive), 128 points altogether
 #define GRAPH_MEMORY 128
-// We store the values as unsigned 16 bit integers (0 to 65535), rather than floats,
-// so that our array is only 256 bytes long, instead of 512 (floats are 32bits).
-uint16_t graph_Mem[GRAPH_MEMORY];
-uint8_t ring_idx = 0; // graph_Mem is managed as a ring buffer.
+float graph_Mem[GRAPH_MEMORY];
+int ring_idx = 0; // graph_Mem is managed as a ring buffer.
 
 // Autoscale management
-uint16_t autoscale_limits[] = {100, 200, 500, 1000, 1500, 2500, 3200}; // in mA
-uint8_t autoscale_size = sizeof(autoscale_limits) / sizeof(uint16_t);
-uint8_t graph_MAX = 0; // Max scale by default
-float autoscale_max_reading = 0;  // The memorized maximum reading over the window
-uint8_t autoscale_countdown = GRAPH_MEMORY;
+int autoscale_limits[] = {100, 200, 500, 1000, 1500, 2500, 3200}; // in mA
+int autoscale_size = sizeof(autoscale_limits) / sizeof(float);
+int graph_MAX = 0; // Max scale by default
+int autoscale_max_reading = 0;
+int autoscale_countdown = GRAPH_MEMORY;
 
 //Button
-ClickButton modeBtn(BTN_PIN, HIGH);
-
-// Serial input buffer
-#define INPUT_BUFFER_SIZE 16
-char input_Buffer[INPUT_BUFFER_SIZE];
-uint8_t input_Buffer_Index;
-
-// Serial output management
-unsigned long lastOutput = 0;
-uint16_t serialOutputRate = 1000;
-
-// On-screen output
-unsigned long lastDisplay = 0;
+const int btnPin = 10;
+ClickButton modeBtn(btnPin, HIGH);
 
 //Current Sensor
 Adafruit_INA219 ina219;
 
-uint16_t OLED_REFRESH_SPEED = 100; //Startup refresh delay
 
-uint8_t graphX = 0; //Start of X for graph
-uint8_t graphY = 0;  //y placement of graph
+int OLED_REFRESH_SPEED = 100; //Startup refresh delay
+//Define refresh delay for each mode
+const int speed0 = 0;
+const int speed1 = 50;
+const int speed2 = 100;
+const int speed3 = 250;
+const int speed4 = 500;
+
+int graphX = 0; //Start of X for graph
+int graphY = 0;  //y placement of graph
 
 //Init OLED Display
 Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
   
 //FriedCircuits Logo for startup 
-static unsigned char FriedCircuitsUSBTester[] PROGMEM = 
+static unsigned char PROGMEM FriedCircuitsUSBTester[] = 
 {
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x0F, 0x87, 0x87, 0xC0, 0x0C, 0x41, 0x86, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x41, 0x86, 0x00,
@@ -178,10 +164,6 @@ volatile float loadvoltage = 0;
 volatile float milliwatthours = 0;
 volatile float milliamphours = 0;
 
-// Serial data lines:
-volatile float dpVoltage = 0;
-volatile float dmVoltage = 0;
-
 // Keep track of peak/min significant values:
 volatile float peakCurrent = 0;
 volatile float voltageAtPeakCurrent = 0;
@@ -191,35 +173,46 @@ volatile float currentAtMinVoltage = 0;
 volatile float voltageAtPeakPower = 0;
 volatile float currentAtPeakPower = 0;
 
-// Keep track of variation of volts/amps over the serial refresh period
-volatile float rpPeakCurrent = 0;
-volatile float rpMinCurrent = 0;
-volatile float rpPeakLoadVolt = 0;
-volatile float rpMinLoadVolt = 0;
-volatile float rpAvgCurrent = 0;
-volatile float rpAvgLoadVolt = 0;
-uint32_t rpSamples = 1;
-
 
 
 // Global defines for polling frequency:
 #define READFREQ 100000 // in microseconds
 
 // Multiple screen support
-uint8_t current_screen = 0;
+int current_screen = 0;
 #define MAX_SCREENS  6;
 
 //Display message handling
 unsigned int setDisplayTime = 0;
 char setMsgDisplay[10];
-uint8_t oldScreen = 0;
+int oldScreen = 0;
 bool msgDisplay = false;
-#define MSGSCREEN 6;
-
+#define msgScreen 6;
 
 /**
- * Initialisation of the sketch
- */
+  Setting the last "X" seconds: use the serial link to set this up, and store value in eeprom ?
+  Add a command for auto screen cycling
+  Add a command to reset readings without unplugging
+
+  Here are all the screens. Going from one screen to the next using a short button press
+
+   - On all screens: instant voltage/current/Watts on bottom line
+
+   - 1st screen: "Graph"
+                current graph
+
+   - 2nd screen: "Peaks / Mins"
+                Peak current since startup (and voltage at that point)
+                Min voltage since startup (and current at that point)
+
+   - 3rd screen: "Energy / Power"
+                Watt hours (mWh until reached 1Wh, then in Wh ? not implemented yet)
+                Peak watts since startup, and current/voltage reading at that point - maximum power point
+                Amp hours since startup? nice to check battery capacity when charging a battery through USB ?
+
+*/
+
+
 void setup()
 {
 
@@ -233,7 +226,7 @@ void setup()
 
   
   Serial.begin(115200);
-  //Serial.println(F("USB Tester OLED Backup Online"));
+  Serial.println("USB Tester OLED Backup Online");
    
   //Init current sensor
   ina219.begin();
@@ -246,7 +239,7 @@ void setup()
   display.setTextColor(WHITE);
  
   // Initialize ring buffer
-  for (uint8_t i=0; i < GRAPH_MEMORY; i++) {
+  for (int i=0; i < GRAPH_MEMORY; i++) {
     graph_Mem[i] = 0;
   }
 
@@ -260,14 +253,13 @@ void setup()
   
   digitalWrite(LEDPIN, LOW);
   
-  
   Timer1.initialize(READFREQ); // 100ms reading interval
   Timer1.attachInterrupt(readADCs); 
 }
 
 /**
  * This is where we do the reading of voltage & current. Should be kept as short
- * as possible, of course. our sampling period is 100ms
+ * as possible, of course.
  */
 void readADCs() {
   // TODO: check exact length of this interrupt routine on the scope using
@@ -286,20 +278,7 @@ void readADCs() {
   milliwatthours += busvoltage*current_mA*READFREQ/1e6/3600; // 1 Wh = 3600 joules
   milliamphours += current_mA*READFREQ/1e6/3600;
   
-  // Update peaks, min and avg during our serial refresh period:
-  if (current_mA > rpPeakCurrent)
-      rpPeakCurrent = current_mA;
-  if (current_mA < rpMinCurrent)
-      rpMinCurrent = current_mA;
-  if (loadvoltage > rpPeakLoadVolt)
-      rpPeakLoadVolt  = loadvoltage;
-  if (loadvoltage < rpMinLoadVolt)
-      rpMinLoadVolt = loadvoltage;
-  rpAvgCurrent = (rpAvgCurrent*rpSamples + current_mA)/(rpSamples+1);
-  rpAvgLoadVolt = (rpAvgLoadVolt*rpSamples + loadvoltage)/(rpSamples+1);
-  rpSamples++;
-  
-  // Update absolute peaks and mins
+  // Update peaks and mins
   if (current_mA > peakCurrent) {
       peakCurrent = current_mA;
       voltageAtPeakCurrent = loadvoltage;
@@ -320,6 +299,8 @@ void readADCs() {
       clearpin(PORTD,5);  // Just a debug signal for my scope to check
                         // how long it takes for the loop below to complete
 #endif
+
+  
 }
 
 
@@ -330,87 +311,81 @@ void loop()
 {
   
   modeBtn.Update();  
-  unsigned long now = millis();
-
-  // Refresh Display  
-  if (now - lastDisplay > OLED_REFRESH_SPEED){
-    
-    // No need to read those inside the interrupt, those are not
-    // time-sensitive
-    dpVoltage = analogRead(USB_DP) * 5.0 / 1024;
-    dmVoltage = analogRead(USB_DM) * 5.0 / 1024;
-
-    
-    // For some reason the display offset jumps around every once in a while
-    // when opening the USB serial port. This sounds like a big bug, but I was not
-    // able to track it down (E. Lafargue)
-    display.ssd1306_command(SSD1306_SETDISPLAYOFFSET);              // 0xD3
-    display.ssd1306_command(0x0);                                   // no offset
-
-    display.clearDisplay();
-    switch (current_screen) {
-      case 0:
-        drawScope();
-        break;
-      case 1:
-        drawEnergy();
-        break;
-      case 2:
-         drawPeakMins();
-         break;
-      case 3:
-         drawBig((current_mA*loadvoltage)/1000, "W",2);
-         break;
-      case 4:
-         drawBig(current_mA, "mA",0);
-         break;
-      case 5:
-         drawBig(loadvoltage, "V",2);
-         break;
-      case 6: //This is a special screen only called within the sketch to take over display with user message
-         drawMsg();
-         break;
-      default:
-        drawScope();
-    }
-    
-    drawBottomLine();
-    display.display();
-    lastDisplay = now;
+  
+  static unsigned long last_interrupt_time2 = 0;
+  unsigned long interrupt_time2 = millis();
+  
+  if (interrupt_time2 - last_interrupt_time2 > OLED_REFRESH_SPEED){
+  
+  //Setup placement for sensor readouts
+  display.clearDisplay();
+  
+  switch (current_screen) {
+    case 0:
+      drawScope();
+      drawBottomLine();
+      break;
+    case 1:
+      drawEnergy();
+      drawBottomLine();
+      break;
+    case 2:
+       drawPeakMins();
+       drawBottomLine();
+       break;
+    case 3:
+       drawBig((current_mA*loadvoltage)/1000, "W",2);
+       drawBottomLine();
+       break;
+    case 4:
+       drawBig(current_mA, "mA",0);
+       drawBottomLine();
+       break;
+    case 5:
+       drawBig(loadvoltage, "V",2);
+       drawBottomLine();
+       break;
+    case 6: //This is a special screen only called within the sketch to take over display with user message
+       drawMsg();
+       break;
+    default:
+      drawScope();
   }
+  
 
-  // Output on serial port
-  if (now - lastOutput > serialOutputRate) {
-    serialOutput();
-    // Reset sampling period:
-    rpPeakCurrent = 0;
-    rpMinCurrent = current_mA;
-    rpPeakLoadVolt = 0;
-    rpMinLoadVolt = loadvoltage;
-    rpAvgCurrent = current_mA;
-    rpAvgLoadVolt = loadvoltage;
-    rpSamples = 1;
+  
+  display.display();
 
-    lastOutput = now;
+  serialOutput();
+  
+  last_interrupt_time2 = interrupt_time2;
+}
+ 
+  
+  if (Serial.available() > 0){
+
+     char in[4];
+     int index = 0;
+     
+     while (Serial.available() > 0) {
+
+        in[index] = Serial.read();
+        index++;
+     
+     }
+     in[index] ='\0';
+     ledWarn = atoi(in);
   }
-
-  // Check if we have serial input
-  while (Serial.available()) {
-    input_Buffer[input_Buffer_Index] = Serial.read();
-    if (input_Buffer[input_Buffer_Index] == '\n') {
-      input_Buffer[input_Buffer_Index] = 0;
-      processInput();
-      input_Buffer_Index = 0;
-    } else 
-      input_Buffer_Index = (input_Buffer_Index+1)%INPUT_BUFFER_SIZE;
-  }
-
-  uint16_t btnState = digitalRead(BTN_PIN);
+  
+  int btnState = digitalRead(btnPin);
   
   if ((current_mA >= ledWarn) || (btnState)){
+   
     digitalWrite(LEDPIN, HIGH);
+   
   }
   else {
+    
      digitalWrite(LEDPIN, LOW);
   }
 
@@ -418,46 +393,12 @@ void loop()
 
 }
 
-// Here are the commands that are supported:
-//   R:XXXX where XXXX is a delay in miliseconds (any valid integer)
-//   S:X    where X is screen number (starting at 1)
-//   W:XXXX where XXXX is the warning threshold in mA for switching on the blue LED
-//   Z:     reset counters
-
-void processInput() {
-  if (input_Buffer[1] != ':')
-    return;
-  switch (input_Buffer[0]) {
-    case 'R':
-      serialOutputRate = atoi(&input_Buffer[2]);
-      if (serialOutputRate < 150) serialOutputRate = 150; // We sample at 100ms, so we need to remain above that value
-      Serial.print(F("{ \"R\":")); Serial.print(serialOutputRate);Serial.println("}");
-      break;
-    case 'S':
-       current_screen = (input_Buffer[2]-49) % MAX_SCREENS;
-       Serial.print(F("{\"S\":"));Serial.println(current_screen);Serial.println("}");
-       break;
-    case 'Z':
-       setButtonMode(-1);
-       Serial.println(F("{\"Z\":\"OK\"}"));
-       break;
-    case 'W':
-       ledWarn = atoi(&input_Buffer[2]);
-       if (ledWarn > 2000) ledWarn = 2000;
-       Serial.print(F("{\"W\":")); Serial.println(ledWarn);Serial.println("}");
-       break;
-    default:
-      break;
-  }
-}
-
-
 
 void drawBottomLine() {
   //Set x,y and print sensor data
-  display.setCursor(0,55);
-  display.print(loadvoltage);   display.print(F("V "));
-  printJustified(current_mA);   display.print(F("mA "));
+  display.setCursor(0,25);
+  display.print(loadvoltage);   display.print("V ");
+  printJustified(current_mA);   display.print("mA ");
   display.print((current_mA*loadvoltage)/1000);  display.print("W");  
 
 }
@@ -472,8 +413,8 @@ void drawScope() {
   // Note: commented out, not quite sure this is very important since
   // the graph is merely a trend indicator - we only have 24 pixels after
   // all
-  display.setCursor(104,0);
-  display.print((autoscale_limits[graph_MAX]+0.0)/1000);
+  // display.setCursor(104,0);
+  // display.print((autoscale_limits[graph_MAX]+0.0)/1000);
 
    
 }
@@ -482,23 +423,23 @@ void drawScope() {
 // power
 void drawEnergy() {
   display.setCursor(0,0);
-  printJustified(milliwatthours,2);
-  display.print(F("mWh "));
-  printJustified(milliamphours,2);
-  display.print(F("mAh"));
+  printJustified2(milliwatthours);
+  display.print("mWh ");
+  printJustified2(milliamphours);
+  display.print("mAh");
 
   display.setCursor(0,8);
-  display.print(F("Peak: "));
+  display.print("Peak: ");
   display.print(voltageAtPeakPower*currentAtPeakPower/1000);
   display.print("W");
   display.setCursor(0,16);
-  display.print(F("@ "));
+  display.print("@ ");
   display.print(voltageAtPeakPower);
-  display.print(F("V & "));
+  display.print("V & ");
   display.print(currentAtPeakPower);
-  display.print(F("mA"));
+  display.print("mA");
   
-  display.drawFastHLine(0,53,128,WHITE);
+  display.drawFastHLine(0,24,128,WHITE);
 
 }
 
@@ -506,26 +447,26 @@ void drawEnergy() {
 // Displays peak and minimum values
 void drawPeakMins() {
   display.setCursor(0,0);
-  display.print(F("Peak:"));
+  display.print("Peak:");
   printJustified(peakCurrent);
-  display.print(F("mA ("));
+  display.print("mA (");
   display.print(voltageAtPeakCurrent);
-  display.print(F("V) "));
+  display.print("V) ");
   display.setCursor(0,9);
-  display.print(F("Min:"));
+  display.print("Min:");
   display.print(minVoltage);
-  display.print(F("V ("));
+  display.print("V (");
   display.print(currentAtMinVoltage);
-  display.print(F("mA)"));
+  display.print("mA)");
   
-  display.drawFastHLine(0,53,128,WHITE);
+  display.drawFastHLine(0,23,128,WHITE);
 
 }
 
 // Displays one big value & unit, with X number of decimals
 // Display width is 7 digits wide, we leave the 2 rightmost digits
 // for unit display
-void drawBig(float val, char* unit, uint8_t decimals) {
+void drawBig(float val, char* unit, int decimals) {
   display.setCursor(0,0);
   display.setTextSize(3);
   if ((decimals < 2) && (val < 1000)) display.print(" ");
@@ -535,23 +476,17 @@ void drawBig(float val, char* unit, uint8_t decimals) {
   display.print(val, decimals);
   display.print(unit);
   display.setTextSize(1);
-  display.println();
-  display.print(F("D+: "));
-  display.println(dpVoltage);
-  display.print(F("D-: "));
-  display.print(dmVoltage);
-  
 }
 
 //Displays message in large font on entire display
-void setMsg(char* msg, uint16_t time)
+void setMsg(char* msg, int time)
 {
    if(msgDisplay == false){
      setDisplayTime = time;
      strcpy(setMsgDisplay, msg);
      msgDisplay=true;
      oldScreen = current_screen;
-     current_screen=MSGSCREEN;
+     current_screen=msgScreen;
    }
 }
 void drawMsg()
@@ -560,7 +495,7 @@ void drawMsg()
   
   if (msgTime <= setDisplayTime){
   display.setCursor(0,0);
-  display.setTextSize(4);
+  display.setTextSize(3);
   display.print(setMsgDisplay);
   display.setTextSize(1);
   msgTime++;
@@ -573,8 +508,7 @@ void drawMsg()
   
 }
 
-// Draw the complete graph. This is also where we update the ring
-// buffer for graph values
+// Draw the complete graph:
 void drawGraph(float reading) {
   
   // Adjust scale: we have GRAPH_MEMORY points, so whenever
@@ -626,10 +560,10 @@ void drawGraph(float reading) {
     }
   }
   
-  graph_Mem[ring_idx] = (uint16_t) reading;
+  graph_Mem[ring_idx] = reading;
   ring_idx = (ring_idx+1)%GRAPH_MEMORY;
-  for (uint8_t i=0; i < GRAPH_MEMORY; i++) {
-    uint8_t val = 54 - map(graph_Mem[(i+ring_idx)%GRAPH_MEMORY], 0, autoscale_limits[graph_MAX], 0, 54);
+  for (int i=0; i < GRAPH_MEMORY; i++) {
+    float val = 24 - mapf(graph_Mem[(i+ring_idx)%GRAPH_MEMORY], 0, autoscale_limits[graph_MAX], 0, 24);
     display.drawPixel(i, val , WHITE);
   }
 }
@@ -637,50 +571,44 @@ void drawGraph(float reading) {
 
   //Serial output for data logging with Java app
 void serialOutput() {
-  Serial.print(F("{ \"a\":{ \"max\":"));
-  Serial.print(rpPeakCurrent);
-  Serial.print(F(", \"min\":"));
-  Serial.print(rpMinCurrent);
-  Serial.print(F(", \"avg\":"));
-  Serial.print(rpAvgCurrent);
-  Serial.print(F("}, \"v\":{ \"max\":"));
-  Serial.print(rpPeakLoadVolt);
-  Serial.print(F(", \"min\":"));
-  Serial.print(rpMinLoadVolt);
-  Serial.print(F(", \"avg\":"));
-  Serial.print(rpAvgLoadVolt);
-  Serial.print(F("}, \"mah\":"));
-  Serial.print(milliamphours);
-  Serial.print(F(", \"mwh\":"));
-  Serial.print(milliwatthours);
-  Serial.print(F(", \"shunt\":"));
+  Serial.print(":");
+  Serial.print(busvoltage);
+  Serial.print(":");
   Serial.print(shuntvoltage);
-  Serial.print(F(", \"dp\":"));
-  Serial.print(dpVoltage);
-  Serial.print(F(", \"dm\":"));
-  Serial.print(dmVoltage);
-  Serial.print(F(", \"ram\":"));
-  Serial.print(freeRam()); //Was for checking free ram during development
-  Serial.println("}");
+  Serial.print(":");
+  Serial.print(loadvoltage);
+  Serial.print(":");
+  Serial.print(current_mA);
+  Serial.print(":");
+  //Serial.print(freeRam()); //Was for checking free ram during development
+  //Serial.print(":");
+  Serial.print(digitalRead(btnPin));
+  Serial.println(":");
   
 }
 
 
-// Right-justify values and round to nearest integer, with optional decimal places
-void printJustified(float val, uint8_t dec)
+// Right-justify values and round to nearest integer
+void printJustified(float val)
 {
   val = floor(val + 0.5);
   if (val < 1000) display.print(" ");
   if (val < 100) display.print(" ");
   if (val < 10) display.print(" ");
   
-  display.print(val,dec); 
+  display.print(val,0); 
 
 }
 
-void printJustified(float val) {
-  printJustified(val,0);
+// Right-justify values
+void printJustified2(float val)
+{
+  if (val < 1000) display.print(" ");
+  if (val < 100) display.print(" ");
+  if (val < 10) display.print(" ");
   
+  display.print(val,2); 
+
 }
 
 
@@ -699,7 +627,7 @@ int freeRam () {
 
 //Handles setting screen and reseting points\
 //Can be used to add function based on 2+ clicks
-void setButtonMode(int8_t btnClicks){
+void setButtonMode(int btnClicks){
 
   switch (btnClicks){
     
@@ -724,7 +652,6 @@ void setButtonMode(int8_t btnClicks){
   }
     
 }
-
 
 
 

@@ -19,20 +19,21 @@ To compile this code you will need the following libraries:
 
 [ClickButton](http://code.google.com/p/clickbutton/)
 
-Download Zip for complete working package for v1 of the Backpack.
+Download ZIP in each version folder for a working set with libraries and configuration of hardware SPI and display size
 
-[OLED_Working_Package-v1.2.zip](https://github.com/FriedCircuits/FC-USB-Tester-OLED-Backpack/blob/master/OLED_Working_Package-v1.2.zip)
 
+
+Use the new firmware version with the new Java app
+
+https://github.com/FriedCircuits/FC-USB-Tester-Data-Logger-App
+
+There may be a bug that shifts the display. We are working on a solution - Testing a new library for the display.
 
 
 How to update firmware:
 
 http://friedcircuits.us/docs/oled-backpack-how-to-update-firmware/
 
-
-This also works with a desktop java appilication for graphing and data logging in real time. 
-
-https://github.com/FriedCircuits/FC-USB-Tester-Data-Logger-App
 
 License: All source code and designs are released under 
 
