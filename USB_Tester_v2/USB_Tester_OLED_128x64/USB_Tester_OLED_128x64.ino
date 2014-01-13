@@ -63,8 +63,10 @@ so action happens after button is let go
 2013.11.10 - Ed Lafargue
 - Add support for basic serial commands
 - Keep graph memory as unsigned ints instead of floats, saves 256 bytes in memory!
-- 
 
+2014.01.12 - William Garrido
+- Improve D-\+ Analog readings by using internal 1.1v ref and dividing by 1023 instead of 1024
+- Split energy readings to multiple lines to take use of larger display and give room for larger readers
 **************************************/
 
 #include <Wire.h>
@@ -337,8 +339,9 @@ void loop()
     
     // No need to read those inside the interrupt, those are not
     // time-sensitive
-    dpVoltage = analogRead(USB_DP) * 5.0 / 1024;
-    dmVoltage = analogRead(USB_DM) * 5.0 / 1024;
+    double vcc = readVcc()/1000.0;
+    dpVoltage = analogRead(USB_DP) * vcc / 1023;
+    dmVoltage = analogRead(USB_DM) * vcc / 1023;
 
     
     // For some reason the display offset jumps around every once in a while
@@ -483,15 +486,15 @@ void drawScope() {
 void drawEnergy() {
   display.setCursor(0,0);
   printJustified(milliwatthours,2);
-  display.print(F("mWh "));
+  display.println(F("mWh "));
   printJustified(milliamphours,2);
   display.print(F("mAh"));
 
-  display.setCursor(0,8);
+  display.setCursor(0,32);
   display.print(F("Peak: "));
   display.print(voltageAtPeakPower*currentAtPeakPower/1000);
   display.print("W");
-  display.setCursor(0,16);
+  display.setCursor(0,40);
   display.print(F("@ "));
   display.print(voltageAtPeakPower);
   display.print(F("V & "));
@@ -727,4 +730,22 @@ void setButtonMode(int8_t btnClicks){
 
 
 
-
+long readVcc() {
+  //http://provideyourown.com/2012/secret-arduino-voltmeter-measure-battery-voltage/
+  // Read 1.1V reference against AVcc
+  // set the reference to Vcc and the measurement to the internal 1.1V reference
+  
+  ADMUX = _BV(REFS0) | _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+   
+  delay(2); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Start conversion
+  while (bit_is_set(ADCSRA,ADSC)); // measuring
+ 
+  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH  
+  uint8_t high = ADCH; // unlocks both
+ 
+  long result = (high<<8) | low;
+ 
+  result = 1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+  return result; // Vcc in millivolts
+}
