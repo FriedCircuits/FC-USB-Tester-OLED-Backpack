@@ -74,6 +74,10 @@ so action happens after button is let go
 - Spilt message handling so that variables are updated outside picture loop.
 - Clean up code
 - Added command to get firmware version
+
+2014-11-10-2014 - William garrido
+-Re-enable device name on startup
+-Add firmware version to display startup
 **************************************/
 
 #include <Wire.h>
@@ -263,15 +267,18 @@ void setup()
   for (uint8_t i=0; i < GRAPH_MEMORY; i++) {
     graph_Mem[i] = 0;
   }
-/*
+
   display.firstPage();
   do {
    display.drawStr( 2, 10, "USB Tester 2.0");
    display.drawStr( 5, 20, "FriedCircuits.us");
+   display.drawStr( 5, 30, "Firmware Version");
+   display.setPrintPos(5,40);
+  display.print(FW_VERSION);
   }while( display.nextPage());
-  delay(1000);
+  delay(2000);
   digitalWrite(LEDPIN, LOW);
-   */
+
   Timer1.initialize(READFREQ); // 100ms reading interval
   Timer1.attachInterrupt(readADCs); 
 }
