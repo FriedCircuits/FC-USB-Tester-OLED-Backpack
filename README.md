@@ -3,17 +3,25 @@ FC-USB-Tester-OLED-Backpack
 This is the source code for the USB Tester OLED Backpack 
 
 Which can be found at:
-https://www.tindie.com/shops/FriedCircuits/
+https://friedcircuits.us/tools/46
 
 
 To compile this code you will need the following libraries:
 ===========================
+Old Version
 
 [Adafruit GFX](https://github.com/adafruit/Adafruit-GFX-Library)
 
 [Adafruit INA219](https://github.com/adafruit/Adafruit_INA219)
 
 [Adafruit SSD1306](https://github.com/adafruit/Adafruit_SSD1306)
+
+2.0
+
+Needs UG8LIB
+https://github.com/olikraus/u8glib
+
+Both Versions
 
 [TimerOne](https://code.google.com/p/arduino-timerone/)
 
