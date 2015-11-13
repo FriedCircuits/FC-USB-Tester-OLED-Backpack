@@ -12,8 +12,6 @@ Old Version
 
 [Adafruit GFX](https://github.com/adafruit/Adafruit-GFX-Library)
 
-[Adafruit INA219](https://github.com/adafruit/Adafruit_INA219)
-
 [Adafruit SSD1306](https://github.com/adafruit/Adafruit_SSD1306)
 
 2.0
@@ -26,6 +24,8 @@ Both Versions
 [TimerOne](https://code.google.com/p/arduino-timerone/)
 
 [ClickButton](http://code.google.com/p/clickbutton/)
+
+[Adafruit INA219](https://github.com/adafruit/Adafruit_INA219)
 
 Download ZIP in each version folder for a working set with libraries and configuration of hardware SPI and display size
 
