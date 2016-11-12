@@ -31,7 +31,7 @@ To compile this code you will need the following libraries:
 
 [UG8LIB] (https://github.com/olikraus/u8glib)
 
-[TimerOne](https://code.google.com/p/arduino-timerone/)
+[TimerOne](https://github.com/PaulStoffregen/TimerOne)
 
 [ClickButton](http://code.google.com/p/clickbutton/)
 

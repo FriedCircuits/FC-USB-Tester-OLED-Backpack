@@ -16,12 +16,11 @@ Old Version
 
 2.0
 
-Needs UG8LIB
-https://github.com/olikraus/u8glib
+Needs [UG8LIB] (https://github.com/olikraus/u8glib)
 
 Both Versions
 
-[TimerOne](https://code.google.com/p/arduino-timerone/)
+[TimerOne](https://github.com/PaulStoffregen/TimerOne)
 
 [ClickButton](http://code.google.com/p/clickbutton/)
 
