@@ -1,0 +1,6 @@
+[submodule "USB_Tester_v2/Beta_FW2.2/libraries/Arduino-EEPROMEx"]
+	path = USB_Tester_v2/Beta_FW2.2/libraries/Arduino-EEPROMEx
+	url = https://github.com/thijse/Arduino-EEPROMEx
+[submodule "USB_Tester_v2/Beta_FW2.2/libraries/TimerOne"]
+	path = USB_Tester_v2/Beta_FW2.2/libraries/TimerOne
+	url = https://github.com/PaulStoffregen/TimerOne
