@@ -8,21 +8,21 @@ https://friedcircuits.us/tools/46
 New Features
 ===========================
 
-*Cleaned up old code and added comment block to every function
-*Events Trigger serial notification of start and end of threshold and percent change
-*Ability to save settings to EEPROM
-*Ability to disable display for long term logging to save on wear
-*New Commmands
-	*E:0 - Disable events
-	*E:1 - mA Threshold trigger - start and end uses existing W: command to set mA threshold
-	*E:2 - Single percent changed
-	*P:XXX - Set percent changed trigger
-	C:0 - Output current saved settings
-	C:1 - Load saved settings
-	C:2 - Save settings
-	C:3 - Output running settings
-	D:0 - Disable display
-	D:1 - Enable display
+* Cleaned up old code and added comment block to every function
+* Events Trigger serial notification of start and end of threshold and percent change
+* Ability to save settings to EEPROM
+* Ability to disable display for long term logging to save on wear
+* New Commmands
+	* E:0 - Disable events
+	* E:1 - mA Threshold trigger - start and end uses existing W: command to set mA threshold
+	* E:2 - Single percent changed
+	* P:XXX - Set percent changed trigger
+	* C:0 - Output current saved settings
+	* C:1 - Load saved settings
+	* C:2 - Save settings
+	* C:3 - Output running settings
+	* D:0 - Disable display
+	* D:1 - Enable display
 
 
 
