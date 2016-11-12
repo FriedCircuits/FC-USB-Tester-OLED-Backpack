@@ -26,7 +26,7 @@ New Features
 
 
 
-To compile this code you will need the following libraries:
+Uses the following libraries:
 ===========================
 
 [UG8LIB] (https://github.com/olikraus/u8glib)
