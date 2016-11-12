@@ -39,10 +39,6 @@ To compile this code you will need the following libraries:
 
 [EEPROMex] (https://github.com/thijse/Arduino-EEPROMEx)
 
-Or use the included zip and extract to Arudino folder. 
-
-
-
 
 
 Firmware can be used with Wizkers.io 
