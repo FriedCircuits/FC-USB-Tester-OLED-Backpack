@@ -1138,5 +1138,5 @@ bool loadConfig() {
  * @return none - saves to EEPROM
  */
 void saveConfig() {
-   EEPROM.writeBlock(configAdress, savedConfig);
+   EEPROM.updateBlock(configAdress, savedConfig);
 }
