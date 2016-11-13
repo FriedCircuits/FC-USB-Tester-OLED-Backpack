@@ -9,6 +9,7 @@ New Features
 ===========================
 
 * Cleaned up old code and added comment block to every function
+* Added run timer, thanks to WeisTekEng
 * Events Trigger serial notification of start and end of threshold and percent change
 * Ability to save settings to EEPROM
 * Ability to disable display for long term logging to save on wear
