@@ -24,7 +24,7 @@ New Features
 	* D:0 - Disable display
 	* D:1 - Enable display
 
-
+Hold button during boot to disable loading settings from EEPROM. 
 
 Uses the following libraries:
 ===========================
