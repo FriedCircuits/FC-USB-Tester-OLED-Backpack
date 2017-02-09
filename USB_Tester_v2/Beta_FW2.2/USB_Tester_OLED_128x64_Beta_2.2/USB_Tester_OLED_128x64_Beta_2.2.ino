@@ -89,6 +89,10 @@
   -EEPROM for saving settings
   -Cmd to turn off display
   -Cleaned up comments and added function comment blocks
+
+  207-01-30 - William Garrido
+  -Increase i2c clock
+  -Increase default sample speed from 100000us to 5000us - Will work at 2000us but fps takes a hit.  
 */
 
 #include <Wire.h>
@@ -180,7 +184,8 @@ unsigned long lastDisplay = 0;
 //Current Sensor
 Adafruit_INA219 ina219;
 
-uint16_t OLED_REFRESH_SPEED = 100; //Startup refresh delay
+//Startup refresh delay - Note uC not fast enough to actually do 100ms, it takes a bit longer
+uint16_t OLED_REFRESH_SPEED = 100; 
 
 uint8_t graphX = 0; //Start of X for graph
 uint8_t graphY = 0;  //y placement of graph
@@ -222,7 +227,7 @@ volatile float rpAvgLoadVolt = 0;
 uint32_t rpSamples = 1;
 
 // Global defines for polling frequency:
-const int READFREQ = 100000; // in microseconds
+const int READFREQ = 5000; // in microseconds
 
 // Multiple screen support
 uint8_t current_screen = 0;
@@ -324,8 +329,9 @@ void setup()
     graph_Mem[i] = 0;
   }
   
-  //Init current sensor
+  //Init current sensor - Set high speed clock - saves 1.2ms sameple time
   ina219.begin();
+  Wire.setClock(800000L);
   
   digitalWrite(LEDPIN, LOW);
 
