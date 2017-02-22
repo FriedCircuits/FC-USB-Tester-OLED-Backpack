@@ -95,6 +95,8 @@
   -Increase default sample speed from 100000us to 5000us - Will work at 2000us but fps takes a hit.  
 
   2017-02-18-19 - William Garrido
+  -Increase sample speed default to 1kHz! This is a biggy feature, made possible by the following optimizations
+  -Increase I2C clock to 800kHz from 100kHz
   -Update macro to include pin, DEBUGSTART/END1 and DEBUGSTART/END2
   -USB D+/- ADC uses int and ADC clock set to 250khz, a bit past recommended of 200khz
   -Removed F() to free up flash and should be faster but uses 14% more RAM, currently we have plenty, might have more flash later after optimizations
