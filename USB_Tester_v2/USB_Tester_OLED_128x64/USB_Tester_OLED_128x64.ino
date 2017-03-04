@@ -87,7 +87,7 @@ so action happens after button is let go
 #include <TimerOne.h>
 #include <ClickButton.h>
 
-#define FW_VERSION 2.10
+#define FW_VERSION 2.11
 
 // All hardware pin usage is defined here:
 //#define OLED_DC 5
@@ -513,10 +513,10 @@ void drawEnergy() {
   display.print(F("Energy Usage"));
   display.drawHLine(0,7,128);
   display.setPrintPos(0,17);
-  printJustified(milliwatthours,2);
+  printJustified2(milliwatthours,2);
   display.print(F("mWh "));
   display.setPrintPos(64,17);
-  printJustified(milliamphours,2);
+  printJustified2(milliamphours,2);
   display.print(F("mAh"));
 
   display.setPrintPos(0,32);
