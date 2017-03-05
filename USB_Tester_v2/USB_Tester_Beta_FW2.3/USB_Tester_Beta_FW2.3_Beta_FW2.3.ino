@@ -1083,8 +1083,8 @@ void setButtonMode(int8_t btnClicks){
         currentAtMinVoltage = current_mA;
         voltageAtPeakPower = 0;
         currentAtPeakPower = 0;
-        milliwatthours = 0;
-        milliamphours = 0;
+        milliwatthours_ACC = 0;
+        milliamphours_ACC = 0;
         uptimeOldMills = millis();
         break;
     case 1:
