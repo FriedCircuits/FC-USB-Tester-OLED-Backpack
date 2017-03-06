@@ -110,7 +110,8 @@
   -Converted current to uint16 intead of float, decimal part was useless anyway. Rounded value in INA219 class
   -Converted voltage to uint16 intead of float, *0.001 when needed to make human readable for serial and OLED  
   -Fix voltage rounding issue for watt calculation due to using int16 instead of float
-  
+  -Allow faster serial rate
+  -2017-03-05 - Fixed mAh,mWh calculations
   TODO: Handle negative current for monitoring battery charging. 
 */
 
@@ -126,7 +127,7 @@
  * Firmware version
  * displayed on splach and serial with V: command
 */
-#define FW_VERSION 2.30
+#define FW_VERSION 2.31
 
 // All hardware pin usage is defined here:
 const byte LEDPIN = 13;
@@ -227,13 +228,12 @@ volatile uint16_t shuntvoltage = 0;
 volatile uint16_t busvoltage = 0;
 volatile uint16_t current_mA = 0;
 volatile uint16_t loadvoltage = 0;
-float milliwatthours = 0;
-float milliamphours = 0;
+volatile float milliwatthours = 0;
+volatile float milliamphours = 0;
 volatile uint64_t milliwatthours_ACC = 0;
 volatile uint64_t milliamphours_ACC = 0;
 float loadvoltage_OUT = 0; //Human readable versions for output
 float voltageAtPeakPower_OUT = 0;
-
 //USB data lines:
 volatile float dpVoltage = 0;
 volatile float dmVoltage = 0;
@@ -401,11 +401,11 @@ void readADCs() {
   current_mA = ina219.getCurrent_mA();
   loadvoltage = ((float)busvoltage + (shuntvoltage / 1000.0))+0.5; 
   //Remove to speed up sensor read, moved calculation to display loop, here we only accumulate
-  //milliwatthours += busvoltage*current_mA*READFREQ/1e6/3600; // 1 Wh = 3600 joules
+  //milliwatthours += (busvoltage*0.001)*current_mA*READFREQ/1e6/3600; // 1 Wh = 3600 joules
   //milliamphours += current_mA*READFREQ/1e6/3600;
-  milliwatthours_ACC += busvoltage * current_mA;
-  milliamphours_ACC += current_mA;
-  
+  milliwatthours_ACC += ((busvoltage*0.001)*current_mA)*1000; 
+  milliamphours_ACC += current_mA;               
+
   // Update peaks, min and avg during our serial refresh period:
   if (current_mA > rpPeakCurrent)
       rpPeakCurrent = current_mA;
@@ -466,8 +466,8 @@ void loop()
 
     //Update mAh and mWh here instead of in acquisition ISR
 
-    milliwatthours = ((milliwatthours_ACC*READFREQ)/1e6/3600)*0.001;
-    milliamphours  = (milliamphours_ACC*READFREQ)/1e6/3600;
+    milliwatthours = ((milliwatthours_ACC*0.001) * READFREQ)/1e6/3600;
+    milliamphours  = (milliamphours_ACC * READFREQ)/1e6/3600;
     	
     //Avg current and voltage here instead of ISR
    	rpAvgCurrent =  (float)currentmA_ACC/rpSamples; 
