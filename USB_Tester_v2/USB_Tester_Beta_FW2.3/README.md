@@ -27,7 +27,7 @@ Beta FW 2.2
 
 Hold button during boot to disable loading settings from EEPROM. 
 
-Beta FW 2.31 - Code review help from @PhilipFreidin from fliptronics.com
+Beta FW 2.3 - Code review help from @PhilipFreidin from fliptronics.com
 * Increase sample speed default to 1kHz! This is a biggy feature, made possible by the following optimizations
 * Increase I2C clock to 800kHz from 100kHz
 * USB D+/- ADC uses int and ADC clock set to 250khz, a bit past recommended of 200khz
@@ -40,10 +40,11 @@ Beta FW 2.31 - Code review help from @PhilipFreidin from fliptronics.com
 * Libraries now included in source folder for portablity and customization of libraries
 * Allow faster serial rate
 * 2.31 fixed mAh/mWh calculations
+* 2.32 optimized mAh/mWh calculations and var clean up
 * TODO: Handle negative current for monitoring battery charging. 
 
-28502 Bytes used
-  130 Bytes free
+28236 Bytes used
+  436 Bytes free
 
 Uses the following libraries:
 ===========================

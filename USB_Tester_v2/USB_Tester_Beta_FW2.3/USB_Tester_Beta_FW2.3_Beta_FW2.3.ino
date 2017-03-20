@@ -94,7 +94,7 @@
   -Increase i2c clock
   -Increase default sample speed from 100000us to 5000us - Will work at 2000us but fps takes a hit.  
 
-  2017-02-18-19 - William Garrido
+  2017-02-18-19 - William Garrido (Help from Philip Freidin)
   -Increase sample speed default to 1kHz! This is a biggy feature, made possible by the following optimizations
   -Increase I2C clock to 800kHz from 100kHz
   -Update macro to include pin, DEBUGSTART/END1 and DEBUGSTART/END2
@@ -112,7 +112,7 @@
   -Fix voltage rounding issue for watt calculation due to using int16 instead of float
   -Allow faster serial rate
   -2017-03-05 - Fixed mAh,mWh calculations
-  TODO: Handle negative current for monitoring battery charging. 
+  -2017-03-13 - Optimize mAh,mWh calc/var clean up   /    TODO: Handle negative current for monitoring battery charging. 
 */
 
 #include <Wire.h>
@@ -127,167 +127,171 @@
  * Firmware version
  * displayed on splach and serial with V: command
 */
-#define FW_VERSION 2.31
+#define               FW_VERSION 2.32
 
 // All hardware pin usage is defined here:
-const byte LEDPIN = 13;
-const byte BTN_PIN = 10;
+const byte            LEDPIN = 13;
+const byte            BTN_PIN = 10;
 //USB Data Lines
-const byte USB_DP = A1;
-const byte USB_DM = A0;
+const byte            USB_DP = A1;
+const byte            USB_DM = A0;
 
 // Define two set/clear macros to do PIN manipulation
 // way way faster than Arduino's digitalWrite.
 // inspired by the the _BV() macro
-#define setpin(port, pin) (port) |= (1 << (pin)) 
-#define clearpin(port, pin) (port) &= ~(1 << (pin))
-#define DEBUGSTART1 setpin(PORTD, 5)
-#define DEBUGEND1  clearpin(PORTD, 5)
-#define DEBUGSTART2 setpin(PORTD, 6)
-#define DEBUGEND2  clearpin(PORTD, 6)
-#define SETLED  setpin(PORTC, 7)
-#define CLEARLED clearpin(PORTC, 7)
+#define               setpin(port, pin) (port) |= (1 << (pin)) 
+#define               clearpin(port, pin) (port) &= ~(1 << (pin))
+#define               DEBUGSTART1 setpin(PORTD, 5)
+#define               DEBUGEND1  clearpin(PORTD, 5)
+#define               DEBUGSTART2 setpin(PORTD, 6)
+#define               DEBUGEND2  clearpin(PORTD, 6)
+#define               SETLED  setpin(PORTC, 7)
+#define               CLEARLED clearpin(PORTC, 7)
 //#define DEBUG 1
 
 //Vars for handling alerts and events via LED and serial
-int16_t ledWarn = 400; //Default threshold in mA
-int16_t aPercentChange = 100; //Default percent change of current for event trigger
-bool eventFlag = false; //Flag for tracking if event has been triggered
-long eventTime = 0; //Time in millis event was triggered
+int16_t               ledWarn = 400; //Default threshold in mA
+int16_t               aPercentChange = 100; //Default percent change of current for event trigger
+bool                  eventFlag = false; //Flag for tracking if event has been triggered
+long                  eventTime = 0; //Time in millis event was triggered
 //Set event type we are triggering on or false if no events
 enum eventT {
   DISABLED = 0,
   WARN = 1, //based on set mA threshhold
   PERCENT = 2 //based on percent changed
 };
-eventT eventType = DISABLED; //Set event type, threshold, percent changed, or disabled(default)
+eventT                  eventType = DISABLED; //Set event type, threshold, percent changed, or disabled(default)
 enum eventData {
   NONE = 0, //No recent event
   START = 1, //Event start
   END = 2, //Event end
   SINGLE = 3 //Single event
 };
-eventData eventStatus = NONE;
+eventData              eventStatus = NONE;
 
 // Graph values:
 // Graph area is from 0 to 127
-#define GRAPH_MEMORY 128
+#define               GRAPH_MEMORY 128
 // We store the values as unsigned 16 bit integers (0 to 65535), rather than floats,
 // so that our array is only 256 bytes long, instead of 512 (floats are 32bits).
-uint8_t graph_Mem[GRAPH_MEMORY];
-uint8_t ring_idx = 0; // graph_Mem is managed as a ring buffer.
+uint8_t               graph_Mem[GRAPH_MEMORY];
+uint8_t               ring_idx = 0; // graph_Mem is managed as a ring buffer.
 //Array for orginal values for scaling
-uint16_t graph_Mem_ORG[GRAPH_MEMORY];
+uint16_t              graph_Mem_ORG[GRAPH_MEMORY];
 
 
 // Autoscale management
-uint16_t autoscale_limits[] = {50, 250, 500, 1000, 1500, 2500, 3200}; //64, 128, 256, 512, 1024, 2048, 4096}; // in mA, power of two so that we can use shifts
-uint8_t autoscale_size = sizeof(autoscale_limits) / sizeof(uint16_t);
-uint8_t graph_MAX = 0; // Max scale by default
-uint16_t autoscale_max_reading = 0;  // The memorized maximum reading over the window
-uint8_t autoscale_countdown = GRAPH_MEMORY;
+uint16_t              autoscale_limits[] = {50, 250, 500, 1000, 1500, 2500, 3200}; //64, 128, 256, 512, 1024, 2048, 4096}; // in mA, power of two so that we can use shifts
+uint8_t               autoscale_size = sizeof(autoscale_limits) / sizeof(uint16_t);
+uint8_t               graph_MAX = 0; // Max scale by default
+uint16_t              autoscale_max_reading = 0;  // The memorized maximum reading over the window
+uint8_t               autoscale_countdown = GRAPH_MEMORY;
 
 //Uptime tracking
-long int uptimeOldMills = 0;
-#define TIMEALL 1 //display time on all available screens. (where space allows)
-#define TIMEENERGY 1 //Display time only on the energy screen.
-uint8_t timeX = 0;
-uint8_t timeY = 7;
+long int              uptimeOldMills = 0;
+#define               TIMEALL 1 //display time on all available screens. (where space allows)
+#define               TIMEENERGY 1 //Display time only on the energy screen.
+uint8_t               timeX = 0;
+uint8_t               timeY = 7;
 
 
 //Button
-ClickButton modeBtn(BTN_PIN, HIGH);
+ClickButton           modeBtn(BTN_PIN, HIGH);
 
 // Serial input buffer
-#define INPUT_BUFFER_SIZE 16
-char input_Buffer[INPUT_BUFFER_SIZE];
-uint8_t input_Buffer_Index;
+#define               INPUT_BUFFER_SIZE 16
+char                  input_Buffer[INPUT_BUFFER_SIZE];
+uint8_t               input_Buffer_Index;
 
 // Serial output management
-unsigned long lastOutput = 0;
-uint16_t serialOutputRate = 1000;
+unsigned long         lastOutput = 0;
+uint16_t              serialOutputRate = 1000;
 
 // On-screen output
-unsigned long lastDisplay = 0;
+unsigned long         lastDisplay = 0;
 
 //Current Sensor
-INA219 ina219;
+INA219                ina219;
 
 //Startup refresh delay - Note uC not fast enough to actually do 100ms, it takes a bit longer
-uint16_t OLED_REFRESH_SPEED = 100; 
+uint16_t              OLED_REFRESH_SPEED = 100; 
 
-uint8_t graphX = 0; //Start of X for graph
-uint8_t graphY = 0;  //y placement of graph
+uint8_t               graphX = 0; //Start of X for graph
+uint8_t               graphY = 0;  //y placement of graph
 
 //Init OLED Display
 U8GLIB_SSD1306_128X64 display(SS, 5, 9);
   
 // Voltages are now read in the interrupt routine, and available in
 // global (volatile because modified within an interrupt) variables:
-volatile uint16_t shuntvoltage = 0;
-volatile uint16_t busvoltage = 0;
-volatile uint16_t current_mA = 0;
-volatile uint16_t loadvoltage = 0;
-volatile float milliwatthours = 0;
-volatile float milliamphours = 0;
-volatile uint64_t milliwatthours_ACC = 0;
-volatile uint64_t milliamphours_ACC = 0;
-float loadvoltage_OUT = 0; //Human readable versions for output
-float voltageAtPeakPower_OUT = 0;
+volatile uint16_t     shuntvoltage = 0;
+volatile uint16_t     busvoltage = 0;
+volatile uint16_t     current_mA = 0;
+volatile uint16_t     loadvoltage = 0;
+volatile float        milliwatthours = 0;
+volatile float        milliamphours = 0;
+volatile uint64_t     milliwatthours_ACC = 0;
+volatile uint64_t     milliamphours_ACC = 0;
+float                 loadvoltage_OUT = 0; //Human readable versions for output
+float                 voltageAtPeakPower_OUT = 0;
 //USB data lines:
-volatile float dpVoltage = 0;
-volatile float dmVoltage = 0;
+volatile float        dpVoltage = 0;
+volatile float        dmVoltage = 0;
 
 // Keep track of peak/min significant values:
-volatile uint16_t peakCurrent = 0;
-volatile uint16_t voltageAtPeakCurrent = 0;
-volatile uint16_t minVoltage = 10000; //adjusted for using int instead of float, may need to be higher if starting voltage is
-volatile uint16_t currentAtMinVoltage = 0;
+volatile uint16_t     peakCurrent = 0;
+volatile uint16_t     voltageAtPeakCurrent = 0;
+volatile uint16_t     minVoltage = 10000; //adjusted for using int instead of float, may need to be higher if starting voltage is
+volatile uint16_t     currentAtMinVoltage = 0;
 // (no need, we can compute it) volatile float peakPower = 0;
-volatile uint16_t voltageAtPeakPower = 0;
-volatile uint16_t currentAtPeakPower = 0;
+volatile uint16_t     voltageAtPeakPower = 0;
+volatile uint16_t     currentAtPeakPower = 0;
 
 // Keep track of variation of volts/amps over the serial refresh period
-volatile uint16_t rpPeakCurrent = 0;
-volatile uint16_t rpMinCurrent = 0;
-volatile uint16_t rpPeakLoadVolt = 0;
-volatile uint16_t rpMinLoadVolt = 0;
-float rpAvgCurrent = 0;
-float rpAvgLoadVolt = 0;
-volatile uint64_t currentmA_ACC = 0;
-volatile uint64_t loadvoltage_ACC = 0; //I think this can be smaller since max is 26V vs 3200mA for current
-volatile uint16_t rpSamples = 1; //variable size limits num samples per serial output/reset depending on sample speed currentl 200Hz
+volatile uint16_t     rpPeakCurrent = 0;
+volatile uint16_t     rpMinCurrent = 0;
+volatile uint16_t     rpPeakLoadVolt = 0;
+volatile uint16_t     rpMinLoadVolt = 0;
+float                 rpAvgCurrent = 0;
+float                 rpAvgLoadVolt = 0;
+volatile uint64_t     currentmA_ACC = 0;
 
-// Global defines for polling frequency:
-const int READFREQ = 1000; // in microseconds
+//I think this can be smaller since max is 26V vs 3200mA for current
+volatile uint64_t     loadvoltage_ACC = 0; 
+//variable size limits num samples per serial output/reset depending on sample speed currentl 200Hz
+volatile uint16_t     rpSamples = 1; 
+
+// Global defines for polling frequency
+// in microseconds
+#define READFREQ     (1000.0) 
 
 // Multiple screen support
-uint8_t current_screen = 0;
-const byte MAX_SCREENS = 6;
+uint8_t               current_screen = 0;
+const byte            MAX_SCREENS = 6;
 
 //Display message handling
-unsigned int setDisplayTime = 0;
-char setMsgDisplay[10];
-uint8_t oldScreen = 0;
-bool msgDisplay = false;
-const byte MSGSCREEN = 6;
+unsigned int          setDisplayTime = 0;
+char                  setMsgDisplay[10];
+uint8_t               oldScreen = 0;
+bool                  msgDisplay = false;
+const byte            MSGSCREEN = 6;
 
 //Track message display time, made global instead of static so that it is not updated during picture loop
-uint8_t msgTime = 0;
+uint8_t               msgTime = 0;
 
 //Flag to disable display, good for longtime logging without wearing display
-bool enDisplay = true;
+bool                  enDisplay = true;
 
 //EEPROM Settings http://playground.arduino.cc/Code/EEPROMLoadAndSaveSettings
 //ID of the settings block
-#define CONFIG_VERSION "1.0"
+#define               CONFIG_VERSION "1.0"
 // Tell it where to store your config data in EEPROM
-const int memBase = 32;
-const int maxAllowedWrites = 20;
-bool eOK = true;
-int configAdress=0;
+const int             memBase = 32;
+const int             maxAllowedWrites = 20;
+bool                  eOK = true;
+int                   configAdress=0;
 //Flag so we know we didn't load saved config on boot so we can still save new values.
-bool skipLoadConfig = false; 
+bool                  skipLoadConfig = false; 
 // Example settings structure
 struct StoreStruct {
     char version[4];   // This is for detection of settings version
@@ -393,17 +397,18 @@ void readADCs() {
       DEBUGSTART1;  //Just a debug signal for my scope to check
                     //how long it takes for the loop below to complete
 #endif
-  
-  sei(); // re-enable interrupts since the ina219 functions need those.
-         // in practice, we're doing nested interrupts, gotta be careful here...
+
+  /* re-enable interrupts since the ina219 functions need those.
+     in practice, we're doing nested interrupts, gotta be careful here...*/
+  sei(); 
   shuntvoltage = ina219.getShuntVoltage_mV();
   busvoltage = ina219.getBusVoltage_V();
   current_mA = ina219.getCurrent_mA();
   loadvoltage = ((float)busvoltage + (shuntvoltage / 1000.0))+0.5; 
-  //Remove to speed up sensor read, moved calculation to display loop, here we only accumulate
-  //milliwatthours += (busvoltage*0.001)*current_mA*READFREQ/1e6/3600; // 1 Wh = 3600 joules
-  //milliamphours += current_mA*READFREQ/1e6/3600;
-  milliwatthours_ACC += ((busvoltage*0.001)*current_mA)*1000; 
+  /*Remove to speed up sensor read, moved calculation to display loop, here we only accumulate
+    milliwatthours += (busvoltage*0.001)*current_mA*READFREQ/1e6/3600; // 1 Wh = 3600 joules
+    milliamphours += current_mA*READFREQ/1e6/3600;*/
+  milliwatthours_ACC += (uint64_t)((uint32_t)busvoltage*(uint32_t)current_mA); 
   milliamphours_ACC += current_mA;               
 
   // Update peaks, min and avg during our serial refresh period:
@@ -415,9 +420,9 @@ void readADCs() {
       rpPeakLoadVolt  = loadvoltage;
   if (loadvoltage < rpMinLoadVolt)
       rpMinLoadVolt = loadvoltage;
-  //Same here keep running total and calculate when avg is needed     
-  //rpAvgCurrent = (rpAvgCurrent*rpSamples + current_mA)/(rpSamples+1);
-  //rpAvgLoadVolt = (rpAvgLoadVolt*rpSamples + loadvoltage)/(rpSamples+1);
+  /*Same here keep running total and calculate when avg is needed     
+    rpAvgCurrent = (rpAvgCurrent*rpSamples + current_mA)/(rpSamples+1);
+    rpAvgLoadVolt = (rpAvgLoadVolt*rpSamples + loadvoltage)/(rpSamples+1);*/
   currentmA_ACC += current_mA;
   loadvoltage_ACC += loadvoltage;
   rpSamples++;
@@ -465,9 +470,8 @@ void loop()
     dmVoltage = (((analogRead(USB_DM) * vcc) >>10))*0.001;
 
     //Update mAh and mWh here instead of in acquisition ISR
-
-    milliwatthours = ((milliwatthours_ACC*0.001) * READFREQ)/1e6/3600;
-    milliamphours  = (milliamphours_ACC * READFREQ)/1e6/3600;
+    milliwatthours = ((float)milliwatthours_ACC/3.6e12) * READFREQ;
+    milliamphours  = ((float)milliamphours_ACC/3.6e9)  * READFREQ;
     	
     //Avg current and voltage here instead of ISR
    	rpAvgCurrent =  (float)currentmA_ACC/rpSamples; 

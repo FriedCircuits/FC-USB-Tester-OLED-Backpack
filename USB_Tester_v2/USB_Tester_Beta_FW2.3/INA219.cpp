@@ -337,7 +337,7 @@ int16_t INA219::getBusVoltage_V() {
   wireReadRegister(INA219_REG_BUSVOLTAGE, &value);
 
   // Shift to the right 3 to drop CNVR and OVF and multiply by LSB
-  return (int16_t)((value >> 3) * 4);
+  return (int16_t)((value >> 3) << 2);
   
 }
 
